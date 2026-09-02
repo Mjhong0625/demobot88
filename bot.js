@@ -74,12 +74,18 @@ function fakeTodayCheckinCount() {
 function mainMenu() {
   return Markup.inlineKeyboard([
     [Markup.button.callback("🔥 限时活动：豪礼派对周", "activity_menu")],
-    [Markup.button.callback("🎁 领取专属Giftcode", "bind_id")],
-    [Markup.button.callback("📅 每日签到", "checkin")],
-    [Markup.button.callback("💎 我的积分", "my_points")],
-    [Markup.button.callback("🎰 幸运抽奖", "lucky_draw")],
-    [Markup.button.callback("🤝 邀请好友赚RM318", "referral")],
-    [Markup.button.callback("❓ 常见问题", "faq_menu")],
+    [
+      Markup.button.callback("🎁 领取Giftcode", "bind_id"),
+      Markup.button.callback("📅 每日签到", "checkin"),
+    ],
+    [
+      Markup.button.callback("💎 我的积分", "my_points"),
+      Markup.button.callback("🎰 幸运抽奖", "lucky_draw"),
+    ],
+    [
+      Markup.button.callback("🤝 邀请好友", "referral"),
+      Markup.button.callback("❓ 常见问题", "faq_menu"),
+    ],
     [Markup.button.callback("🛠️ 内部功能展示（团队协作）", "internal_menu")],
   ]);
 }
@@ -192,8 +198,10 @@ bot.action("checkin", async (ctx) => {
   }
 
   await ctx.editMessageText(msg, Markup.inlineKeyboard([
-    [Markup.button.callback("🎰 用积分试试手气", "lucky_draw")],
-    [Markup.button.callback("⬅️ 返回主菜单", "back_menu")],
+    [
+      Markup.button.callback("🎰 试试手气", "lucky_draw"),
+      Markup.button.callback("⬅️ 返回主菜单", "back_menu"),
+    ],
   ]));
 });
 
@@ -265,8 +273,10 @@ bot.action("lucky_draw", async (ctx) => {
   await ctx.reply(
     "分享给好友，你和朋友都能再抽一次 👇",
     Markup.inlineKeyboard([
-      [Markup.button.callback("📤 分享给好友再抽一次", "referral")],
-      [Markup.button.callback("🎰 再抽一次", "lucky_draw")],
+      [
+        Markup.button.callback("📤 分享给好友", "referral"),
+        Markup.button.callback("🎰 再抽一次", "lucky_draw"),
+      ],
       [Markup.button.callback("⬅️ 返回主菜单", "back_menu")],
     ])
   );
@@ -288,8 +298,10 @@ bot.action("referral", async (ctx) => {
       `📊 已邀请：${m.referrals} 人\n💰 已赚取：RM${m.referralEarnings}\n\n` +
       `规则：\n每成功邀请1位好友完成绑定 = RM18\n邀满10人额外再奖 RM138`,
     Markup.inlineKeyboard([
-      [Markup.button.callback("📤 分享邀请链接", "share_referral")],
-      [Markup.button.callback("⬅️ 返回主菜单", "back_menu")],
+      [
+        Markup.button.callback("📤 分享邀请链接", "share_referral"),
+        Markup.button.callback("⬅️ 返回主菜单", "back_menu"),
+      ],
     ])
   );
 });
@@ -320,8 +332,10 @@ bot.action("activity_menu", async (ctx) => {
       `🏆 累充满RM500，抽iPhone17 ProMax\n` +
       `🧧 每晚8点整点红包雨，手快有手慢无`,
     Markup.inlineKeyboard([
-      [Markup.button.callback("💰 立即冲榜", "activity_contribute")],
-      [Markup.button.callback("📊 查看我的活动进度", "activity_progress")],
+      [
+        Markup.button.callback("💰 立即冲榜", "activity_contribute"),
+        Markup.button.callback("📊 查看进度", "activity_progress"),
+      ],
       [Markup.button.callback("⬅️ 返回主菜单", "back_menu")],
     ])
   );
@@ -336,8 +350,10 @@ bot.action("activity_progress", async (ctx) => {
       `已累计冲榜：RM${m.contributed} / RM500\n` +
       (remain > 0 ? `还差 RM${remain} 即可抽 iPhone17 ProMax 🎯` : `🎉 已达标！快去客服兑换你的抽奖资格`),
     Markup.inlineKeyboard([
-      [Markup.button.callback("💰 现在就冲", "activity_contribute")],
-      [Markup.button.callback("⬅️ 返回主菜单", "back_menu")],
+      [
+        Markup.button.callback("💰 现在就冲", "activity_contribute"),
+        Markup.button.callback("⬅️ 返回主菜单", "back_menu"),
+      ],
     ])
   );
 });
@@ -371,10 +387,14 @@ bot.action("faq_menu", async (ctx) => {
   await ctx.editMessageText(
     "❓ 常见问题",
     Markup.inlineKeyboard([
-      [Markup.button.callback("📝 如何注册", "faq_register")],
-      [Markup.button.callback("💰 如何充值", "faq_deposit")],
-      [Markup.button.callback("🏧 如何提现", "faq_withdraw")],
-      [Markup.button.callback("⬅️ 返回主菜单", "back_menu")],
+      [
+        Markup.button.callback("📝 如何注册", "faq_register"),
+        Markup.button.callback("💰 如何充值", "faq_deposit"),
+      ],
+      [
+        Markup.button.callback("🏧 如何提现", "faq_withdraw"),
+        Markup.button.callback("⬅️ 返回主菜单", "back_menu"),
+      ],
     ])
   );
 });
@@ -398,8 +418,10 @@ bot.action("internal_menu", async (ctx) => {
       `正式运作时会在每天固定时间（例如中午12点）自动发送到内部工作群，\n` +
       `这里让你直接点开看看实际内容长什么样：`,
     Markup.inlineKeyboard([
-      [Markup.button.callback("📝 今日发文", "internal_posts")],
-      [Markup.button.callback("📊 数据汇报", "internal_report")],
+      [
+        Markup.button.callback("📝 今日发文", "internal_posts"),
+        Markup.button.callback("📊 数据汇报", "internal_report"),
+      ],
       [Markup.button.callback("👥 工作分配", "internal_tasks")],
       [Markup.button.callback("⬅️ 返回主菜单", "back_menu")],
     ])
@@ -408,8 +430,10 @@ bot.action("internal_menu", async (ctx) => {
 
 function internalBackButton() {
   return Markup.inlineKeyboard([
-    [Markup.button.callback("⬅️ 返回内部功能展示", "internal_menu")],
-    [Markup.button.callback("🏠 返回主菜单", "back_menu")],
+    [
+      Markup.button.callback("⬅️ 内部功能展示", "internal_menu"),
+      Markup.button.callback("🏠 主菜单", "back_menu"),
+    ],
   ]);
 }
 
