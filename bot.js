@@ -134,6 +134,21 @@ async function safeEdit(ctx, text, extra) {
   }
 }
 
+// 用于「这个画面要改成图片呈现」的场景：不管当前讯息原本是文字还是图片，
+// 一律先删掉原讯息，再重新发一张图片（或图片抓不到时退回纯文字）。
+async function sendPhotoScreen(ctx, imageId, caption, extra) {
+  try { await ctx.deleteMessage(); } catch (e) {}
+  if (imageId) {
+    try {
+      await ctx.replyWithPhoto(imageId, { caption, ...extra });
+      return;
+    } catch (err) {
+      console.error("发送图片画面失败，改用纯文字:", err.message);
+    }
+  }
+  await ctx.reply(caption, extra);
+}
+
 // 全局错误处理：任何单一讯息处理出错（比如格式解析失败），只记录log，不让整个bot当掉
 bot.catch((err, ctx) => {
   console.error(`处理讯息时发生错误 (update ${ctx.update.update_id}):`, err.message);
@@ -407,7 +422,9 @@ bot.action("share_referral", async (ctx) => {
 
 bot.action("activity_menu", async (ctx) => {
   await ctx.answerCbQuery();
-  await safeEdit(ctx, 
+  await sendPhotoScreen(
+    ctx,
+    process.env.ACTIVITY_IMAGE_URL,
     `🎉 豪礼派对周｜Golden Party Week\n\n` +
       `📅 活动倒数：${formatCountdown()}\n\n` +
       `本周三大福利：\n` +
@@ -614,6 +631,8 @@ http
     .catch((err) => console.error("❌ bot.launch 发生错误:", err.message));
 
   console.log(`${BRAND_NAME} Demo Bot 已启动`);
+  console.log(`[环境变量检查] WELCOME_IMAGE_URL = ${process.env.WELCOME_IMAGE_URL || "（未设置）"}`);
+  console.log(`[环境变量检查] ACTIVITY_IMAGE_URL = ${process.env.ACTIVITY_IMAGE_URL || "（未设置）"}`);
 })();
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
