@@ -54,6 +54,35 @@ function randomCode() {
   return "DEMO-" + Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
+// ---- VIP 等级阶梯 ----
+const TIERS = [
+  { name: "Bronze", emoji: "🥉", min: 0 },
+  { name: "Silver", emoji: "🥈", min: 100 },
+  { name: "Gold", emoji: "🥇", min: 300 },
+  { name: "Diamond", emoji: "💎", min: 600 },
+];
+
+function getTier(points) {
+  let tier = TIERS[0];
+  for (const t of TIERS) if (points >= t.min) tier = t;
+  return tier;
+}
+
+function getNextTier(points) {
+  return TIERS.find((t) => t.min > points) || null;
+}
+
+function tierLadderDisplay(points) {
+  const current = getTier(points);
+  return TIERS.map((t) => (t.name === current.name ? `▶️${t.emoji}${t.name}◀️` : `${t.emoji}${t.name}`)).join("  →  ");
+}
+
+// ---- 色块进度条 ----
+function progressBar(current, total, size = 7) {
+  const filled = Math.max(0, Math.min(current, total));
+  return "🟩".repeat(filled) + "⬜".repeat(Math.max(total - filled, 0));
+}
+
 function formatCountdown() {
   const diffMs = ACTIVITY_END.getTime() - Date.now();
   if (diffMs <= 0) return "活动已结束";
@@ -94,24 +123,44 @@ function backButton() {
   return Markup.inlineKeyboard([[Markup.button.callback("⬅️ 返回主菜单", "back_menu")]]);
 }
 
+// 统一的「编辑或重发」处理：如果当前讯息是图片（例如 /start 的欢迎图），
+// 没办法直接把它编辑成纯文字讯息，这时改成删除原讯息、重新发一条文字。
+async function safeEdit(ctx, text, extra) {
+  try {
+    await ctx.editMessageText(text, extra);
+  } catch (err) {
+    try { await ctx.deleteMessage(); } catch (e) {}
+    await ctx.reply(text, extra);
+  }
+}
+
 bot.start(async (ctx) => {
   getMember(ctx.from);
   const todayCount = fakeTodayCheckinCount();
-  await ctx.reply(
+  const caption =
     `👋 欢迎加入 ${BRAND_NAME} VIP专属通道！\n\n` +
-      `🔥 新会员首绑即领 Giftcode\n` +
-      `🎁 今日已有 ${todayCount} 人签到领奖\n` +
-      `💰 邀请好友最高可得 RM318\n\n` +
-      `（这是功能展示 Demo，数据仅供体验，正式上线会串接真实平台后台）\n\n` +
-      `请点击下方按钮开始体验：`,
-    mainMenu()
-  );
+    `🔥 新会员首绑即领 Giftcode\n` +
+    `🎁 今日已有 ${todayCount} 人签到领奖\n` +
+    `💰 邀请好友最高可得 RM318\n\n` +
+    `（这是功能展示 Demo，数据仅供体验，正式上线会串接真实平台后台）\n\n` +
+    `请点击下方按钮开始体验：`;
+
+  const bannerUrl = process.env.WELCOME_IMAGE_URL;
+  if (bannerUrl) {
+    try {
+      await ctx.replyWithPhoto(bannerUrl, { caption, ...mainMenu() });
+      return;
+    } catch (err) {
+      console.error("发送欢迎图片失败，改用纯文字:", err.message);
+    }
+  }
+  await ctx.reply(caption, mainMenu());
 });
 
 bot.action("back_menu", async (ctx) => {
   await ctx.answerCbQuery();
   const todayCount = fakeTodayCheckinCount();
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     `🔥 新会员首绑即领 Giftcode\n🎁 今日已有 ${todayCount} 人签到领奖\n💰 邀请好友最高可得 RM318\n\n请点击下方按钮选择服务：`,
     mainMenu()
   );
@@ -123,11 +172,24 @@ bot.action("back_menu", async (ctx) => {
 
 bot.action("bind_id", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     "🎁 新会员专属Giftcode\n\n请输入你的游戏ID解锁专属Code：",
     backButton()
   );
   pendingBind.add(ctx.from.id);
+});
+
+// 临时工具：把图片传给bot，会直接回传这张图片的 file_id，
+// 拿到后填进 WELCOME_IMAGE_URL 环境变量即可，不需要透过 Google Drive 外部连结。
+bot.on("photo", async (ctx) => {
+  if (ctx.chat.type !== "private") return;
+  const sizes = ctx.message.photo;
+  const fileId = sizes[sizes.length - 1].file_id; // 取最大尺寸那张
+  await ctx.reply(
+    `📎 图片已收到，file_id 如下（点击可复制）：\n\n\`${fileId}\`\n\n` +
+      `把这串貼进 Railway 的 WELCOME_IMAGE_URL 变量即可，不需要 Google Drive 连结。`,
+    { parse_mode: "Markdown" }
+  );
 });
 
 bot.on("text", async (ctx) => {
@@ -139,11 +201,11 @@ bot.on("text", async (ctx) => {
     const m = getMember(ctx.from);
     m.giftcode = randomCode();
     await ctx.reply(
-      `🎉 恭喜解锁！\n\n` +
-        `你的专属Giftcode：${m.giftcode}\n\n` +
-        `⚠️ 此Code为一次性专属，24小时内使用，逾期作废\n` +
+      `🎉 *恭喜解锁！*\n\n` +
+        `你的专属Giftcode（点击可复制）：\n\`${m.giftcode}\`\n\n` +
+        `⚠️ 此Code为一次性专属，*24小时内*使用，逾期作废\n` +
         `👉 立即使用领取新手礼包`,
-      mainMenu()
+      { parse_mode: "Markdown", ...mainMenu() }
     );
     return;
   }
@@ -164,8 +226,9 @@ bot.action("checkin", async (ctx) => {
 
   if (record.lastDate === today) {
     const remain = Math.max(VIP_UNLOCK_DAYS - record.streak, 0);
-    await ctx.editMessageText(
-      `📅 你今天已经签到过啦！\n\n🔥 连续签到：${record.streak}天\n` +
+    const bar = progressBar(record.streak, VIP_UNLOCK_DAYS);
+    await safeEdit(ctx, 
+      `📅 你今天已经签到过啦！\n\n🔥 连续签到：${record.streak}天\n${bar} ${Math.min(record.streak, VIP_UNLOCK_DAYS)}/${VIP_UNLOCK_DAYS}天\n` +
         (remain > 0 ? `再签到 ${remain} 天，解锁 VIP 会员 + RM50 彩金！` : `🎉 你已经是 VIP 会员！`),
       backButton()
     );
@@ -186,18 +249,19 @@ bot.action("checkin", async (ctx) => {
   m.points += bonus;
 
   const remain = Math.max(VIP_UNLOCK_DAYS - streak, 0);
+  const bar = progressBar(streak, VIP_UNLOCK_DAYS);
   let msg = `✅ 签到成功！第 ${streak} 天\n\n`;
   if (broke) msg += `⚠️ 上次进度已中断，本次重新开始计算\n\n`;
   msg += `🔥 连续签到：${streak}天\n💎 获得 ${bonus} 积分`;
   if (streak > 1) msg += `（连续签到加成 +${bonus - 10}）`;
-  msg += `\n`;
+  msg += `\n${bar} ${Math.min(streak, VIP_UNLOCK_DAYS)}/${VIP_UNLOCK_DAYS}天\n`;
   if (remain > 0) {
     msg += `再坚持 ${remain} 天，解锁 VIP 会员 🎯\n⚠️ 断签1天，进度将会重置`;
   } else {
     msg += `🎉 恭喜解锁 VIP 会员 + RM50 彩金！`;
   }
 
-  await ctx.editMessageText(msg, Markup.inlineKeyboard([
+  await safeEdit(ctx, msg, Markup.inlineKeyboard([
     [
       Markup.button.callback("🎰 试试手气", "lucky_draw"),
       Markup.button.callback("⬅️ 返回主菜单", "back_menu"),
@@ -213,8 +277,22 @@ bot.action("my_points", async (ctx) => {
   await ctx.answerCbQuery();
   const m = getMember(ctx.from);
   const record = checkins.get(ctx.from.id) || { streak: 0 };
-  await ctx.editMessageText(
+  const tier = getTier(m.points);
+  const nextTier = getNextTier(m.points);
+
+  let tierLine = `当前等级：${tier.emoji} ${tier.name}\n${tierLadderDisplay(m.points)}\n`;
+  if (nextTier) {
+    const need = nextTier.min - m.points;
+    const barTotal = nextTier.min - tier.min;
+    const barCurrent = m.points - tier.min;
+    tierLine += `${progressBar(Math.round((barCurrent / barTotal) * 7), 7)} 再赚 ${need} 积分升级 ${nextTier.emoji} ${nextTier.name}\n`;
+  } else {
+    tierLine += `🎉 已达最高等级！\n`;
+  }
+
+  await safeEdit(ctx, 
     `💎 我的积分\n\n` +
+      `${tierLine}\n` +
       `累积积分：${m.points}\n` +
       `连续签到：${record.streak}天\n` +
       `已邀请好友：${m.referrals}人\n` +
@@ -292,7 +370,7 @@ bot.action("referral", async (ctx) => {
   const botUsername = ctx.botInfo?.username || "DemoBet88_bot";
   const link = `https://t.me/${botUsername}?start=ref_${ctx.from.id}`;
 
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     `🤝 邀请好友，最高赚 RM318\n\n` +
       `你的专属邀请链接：\n${link}\n\n` +
       `📊 已邀请：${m.referrals} 人\n💰 已赚取：RM${m.referralEarnings}\n\n` +
@@ -312,7 +390,7 @@ bot.action("share_referral", async (ctx) => {
   const m = getMember(ctx.from);
   m.referrals += 1;
   m.referralEarnings += 18;
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     `✅ 分享成功（Demo模拟已有1位好友完成绑定）\n\n💰 获得推荐奖金 RM18\n📊 已邀请：${m.referrals} 人\n💰 累计赚取：RM${m.referralEarnings}`,
     backButton()
   );
@@ -324,7 +402,7 @@ bot.action("share_referral", async (ctx) => {
 
 bot.action("activity_menu", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     `🎉 豪礼派对周｜Golden Party Week\n\n` +
       `📅 活动倒数：${formatCountdown()}\n\n` +
       `本周三大福利：\n` +
@@ -345,9 +423,10 @@ bot.action("activity_progress", async (ctx) => {
   await ctx.answerCbQuery();
   const m = getMember(ctx.from);
   const remain = Math.max(500 - m.contributed, 0);
-  await ctx.editMessageText(
+  const bar = progressBar(Math.round((m.contributed / 500) * 7), 7);
+  await safeEdit(ctx, 
     `📊 你的豪礼派对周进度\n\n` +
-      `已累计冲榜：RM${m.contributed} / RM500\n` +
+      `${bar}\n已累计冲榜：RM${m.contributed} / RM500\n` +
       (remain > 0 ? `还差 RM${remain} 即可抽 iPhone17 ProMax 🎯` : `🎉 已达标！快去客服兑换你的抽奖资格`),
     Markup.inlineKeyboard([
       [
@@ -364,9 +443,10 @@ bot.action("activity_contribute", async (ctx) => {
   const m = getMember(ctx.from);
   m.contributed = Math.min(m.contributed + 100, 500);
   const remain = Math.max(500 - m.contributed, 0);
-  await ctx.editMessageText(
+  const bar = progressBar(Math.round((m.contributed / 500) * 7), 7);
+  await safeEdit(ctx, 
     `✅ 冲榜成功（Demo模拟 +RM100）\n\n` +
-      `已累计冲榜：RM${m.contributed} / RM500\n` +
+      `${bar}\n已累计冲榜：RM${m.contributed} / RM500\n` +
       (remain > 0 ? `还差 RM${remain} 即可抽 iPhone17 ProMax 🎯` : `🎉 已达标！快去客服兑换你的抽奖资格`),
     backButton()
   );
@@ -384,7 +464,7 @@ const FAQ = {
 
 bot.action("faq_menu", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     "❓ 常见问题",
     Markup.inlineKeyboard([
       [
@@ -402,7 +482,7 @@ bot.action("faq_menu", async (ctx) => {
 ["register", "deposit", "withdraw"].forEach((key) => {
   bot.action(`faq_${key}`, async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.editMessageText(`${FAQ[key].title}\n\n${FAQ[key].text}`, backButton());
+    await safeEdit(ctx, `${FAQ[key].title}\n\n${FAQ[key].text}`, backButton());
   });
 });
 
@@ -412,7 +492,7 @@ bot.action("faq_menu", async (ctx) => {
 
 bot.action("internal_menu", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     `🛠️ 内部工作管理系统 Demo\n\n` +
       `以下是团队协作后台会自动产出的内容示范，\n` +
       `正式运作时会在每天固定时间（例如中午12点）自动发送到内部工作群，\n` +
@@ -439,7 +519,7 @@ function internalBackButton() {
 
 bot.action("internal_posts", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     `📝 今日发文排程（Demo 示范）\n\n` +
       `以下3篇文案已排定今日发布时间，请内容同事确认：\n\n` +
       `━━━━━━━━━━\n` +
@@ -475,7 +555,7 @@ bot.action("internal_posts", async (ctx) => {
 
 bot.action("internal_report", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     `📊 数据汇报（Demo 示范）\n\n` +
       `📅 昨日数据摘要\n\n` +
       `👥 新增会员：128 人\n` +
@@ -492,7 +572,7 @@ bot.action("internal_report", async (ctx) => {
 
 bot.action("internal_tasks", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
+  await safeEdit(ctx, 
     `👥 工作分配（Demo 示范）\n\n` +
       `📱 内容组\n` +
       `・09:00 发布晨间暖场文案\n・14:00 发布活动进度更新\n・20:00 发布晚间红包预告\n` +
