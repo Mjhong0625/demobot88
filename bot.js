@@ -134,6 +134,11 @@ async function safeEdit(ctx, text, extra) {
   }
 }
 
+// 全局错误处理：任何单一讯息处理出错（比如格式解析失败），只记录log，不让整个bot当掉
+bot.catch((err, ctx) => {
+  console.error(`处理讯息时发生错误 (update ${ctx.update.update_id}):`, err.message);
+});
+
 bot.start(async (ctx) => {
   getMember(ctx.from);
   const todayCount = fakeTodayCheckinCount();
@@ -186,9 +191,9 @@ bot.on("photo", async (ctx) => {
   const sizes = ctx.message.photo;
   const fileId = sizes[sizes.length - 1].file_id; // 取最大尺寸那张
   await ctx.reply(
-    `📎 图片已收到，file_id 如下（点击可复制）：\n\n\`${fileId}\`\n\n` +
+    `📎 图片已收到，file_id 如下（点击可复制）：\n\n<code>${fileId}</code>\n\n` +
       `把这串貼进 Railway 的 WELCOME_IMAGE_URL 变量即可，不需要 Google Drive 连结。`,
-    { parse_mode: "Markdown" }
+    { parse_mode: "HTML" }
   );
 });
 
@@ -201,11 +206,11 @@ bot.on("text", async (ctx) => {
     const m = getMember(ctx.from);
     m.giftcode = randomCode();
     await ctx.reply(
-      `🎉 *恭喜解锁！*\n\n` +
-        `你的专属Giftcode（点击可复制）：\n\`${m.giftcode}\`\n\n` +
-        `⚠️ 此Code为一次性专属，*24小时内*使用，逾期作废\n` +
+      `🎉 <b>恭喜解锁！</b>\n\n` +
+        `你的专属Giftcode（点击可复制）：\n<code>${m.giftcode}</code>\n\n` +
+        `⚠️ 此Code为一次性专属，<b>24小时内</b>使用，逾期作废\n` +
         `👉 立即使用领取新手礼包`,
-      { parse_mode: "Markdown", ...mainMenu() }
+      { parse_mode: "HTML", ...mainMenu() }
     );
     return;
   }
