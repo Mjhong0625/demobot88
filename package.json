@@ -1,0 +1,15 @@
+{
+  "name": "demobet88-demo-bot",
+  "version": "1.0.0",
+  "description": "菠菜平台 Telegram Bot 功能展示 Demo（会员系统/签到积分/抽奖/FAQ + 内部工作群提醒）",
+  "main": "bot.js",
+  "scripts": { "start": "node bot.js" },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "google-spreadsheet": "^4.1.4",
+    "google-auth-library": "^9.14.2",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3"
+  },
+  "engines": { "node": ">=18" }
+}
