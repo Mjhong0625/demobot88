@@ -50,6 +50,8 @@ function defaults() {
     },
     announcements: [],
     media: [],
+    users: [],
+    targets: [],
     events: [],
     log: [],
   };
@@ -85,8 +87,8 @@ function logEvent(type, userId) {
   save();
 }
 
-function logAction(action, detail) {
-  data.log.unshift({ t: Date.now(), action, detail: detail || "" });
+function logAction(action, detail, actor) {
+  data.log.unshift({ t: Date.now(), action, detail: detail || "", by: actor || "系统" });
   if (data.log.length > 300) data.log.length = 300;
   save();
 }

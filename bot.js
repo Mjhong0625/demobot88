@@ -153,6 +153,12 @@ bot.start(async (ctx) => {
 });
 
 bot.command("chatid", (ctx) => ctx.reply(`Chat ID：${ctx.chat.id}\nUser ID：${ctx.from.id}`));
+// /menu：随时重新打开主菜单（后台「机器人资料」的命令列表里可以放这条）
+bot.command("menu", async (ctx) => {
+  if (ctx.chat.type !== "private") return;
+  pendingBind.delete(ctx.from.id);
+  await ctx.reply("请点击下方按钮选择服务：", mainMenu());
+});
 
 bot.action("back_menu", async (ctx) => {
   await ctx.answerCbQuery();
@@ -457,6 +463,7 @@ bot.action("internal_tasks", async (ctx) => {
 async function sendAnnouncement(a, chatId) {
   const text = a.text || "";
   const media = a.mediaId ? D().media.find((m) => m.id === a.mediaId) : null;
+  if (a.mediaId && !media) throw new Error("素材已被删除或已过期，请重新选择素材");
   if (media) {
     const send = media.type === "video" ? bot.telegram.sendVideo.bind(bot.telegram) : bot.telegram.sendPhoto.bind(bot.telegram);
     if (text.length <= 1024) {
@@ -470,6 +477,16 @@ async function sendAnnouncement(a, chatId) {
   }
 }
 
+// 公告的发布位置：优先用后台「常用发布位置」，其次旧版直接填的ID，最后是 DEFAULT_TARGET
+function resolveChat(a) {
+  if (a.targetId) {
+    if (a.targetId === "__default") return process.env.DEFAULT_TARGET || null;
+    const t = D().targets.find((x) => x.id === a.targetId);
+    return t ? t.chatId : null;
+  }
+  return a.target || process.env.DEFAULT_TARGET || null;
+}
+
 let sending = false;
 async function checkSchedule() {
   if (sending) return;
@@ -478,10 +495,11 @@ async function checkSchedule() {
     const now = Date.now();
     for (const a of D().announcements) {
       if (a.status !== "scheduled" || !a.at || new Date(a.at).getTime() > now) continue;
-      const target = a.target || process.env.DEFAULT_TARGET;
+      const target = resolveChat(a);
       if (!target) {
-        a.status = "failed"; a.error = "没有填写发布位置，也没有设定 DEFAULT_TARGET";
+        a.status = "failed"; a.error = "找不到发布位置（可能已被删除），请重新选择发布位置";
         store.logAction("发送失败", `${a.title}：${a.error}`);
+        store.save();
         continue;
       }
       try {
@@ -504,7 +522,7 @@ setInterval(checkSchedule, 30000);
 // ---------------- 启动：后台 + bot ----------------
 let botReady = false;
 const { startAdmin } = require("./admin");
-startAdmin({ bot, store, sendAnnouncement, isReady: () => botReady });
+startAdmin({ bot, store, sendAnnouncement, checkNow: checkSchedule, isReady: () => botReady, token: BOT_TOKEN });
 
 bot
   .launch({ allowedUpdates: ["message", "callback_query"] }, () => { botReady = true; console.log("Telegram 连线成功"); })
@@ -513,6 +531,12 @@ bot
 console.log(`${D().brand} Demo Bot 已启动`);
 console.log(`[环境变量检查] STORAGE_CHAT_ID = ${process.env.STORAGE_CHAT_ID || "（未设置，素材上传会失败）"}`);
 console.log(`[环境变量检查] ADMIN_PASSWORD = ${process.env.ADMIN_PASSWORD ? "已设置" : "（未设置，将随机产生）"}`);
+console.log(`[环境变量检查] MEDIA_TTL_DAYS = ${process.env.MEDIA_TTL_DAYS || "30（默认）"}`);
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+// 收到停止信号（例如 Railway 重新部署）：先停 bot，再真正退出，避免旧进程卡着不放端口
+function shutdown(sig) {
+  try { bot.stop(sig); } catch (e) {}
+  setTimeout(() => process.exit(0), 300);
+}
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));

@@ -103,17 +103,18 @@ textarea{min-height:140px;resize:vertical}
   .grid4{grid-template-columns:1fr 1fr}.two,.modal{grid-template-columns:1fr}.modal .r{border-radius:0 0 22px 22px}.bcard .g{grid-template-columns:1fr}
 }
 </style>
+<link rel="stylesheet" href="/mjh-ui.css"><link rel="stylesheet" href="/app.css">
 </head>
 <body>
+<div class="initial-loading" id="initialLoading" role="status"><b>MJH DESK</b><div class="load-mark"></div><p>正在连接您的工作空间…</p></div>
 <div id="login" class="login hide">
-  <form id="lf">
-    <div class="logo">MJH<small> &amp;Co.</small></div><div class="sub">MEMBER DESK</div>
-    <label style="margin-top:0">后台密码</label>
-    <input type="password" id="pw" autofocus>
-    <div id="lerr" class="hint" style="color:var(--danger)"></div>
-    <button class="btn" style="width:100%;margin-top:16px">登入</button>
-  </form>
-</div>
+<section class="login-visual" aria-label="MJH 品牌工作台">
+<div class="logo">MJH<small> &amp;Co.</small></div>
+<div class="login-story"><span class="eyebrow">YOUR COMMUNITY, CONNECTED.</span><h1>日常工作，井然有序。<br><span>每一步，都更简单。</span></h1><p>内容、素材与社群数据，<br>在一个清楚的工作台里完成。</p><div class="login-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 12 2 2 4-4"/><rect x="3" y="3" width="18" height="18" rx="5"/></svg><div><b>少一点繁琐，多一点从容。</b><small>清楚的数据 · 简单的操作</small></div><i></i></div></div>
+<div class="login-signature">MEMBER DESK &nbsp; / &nbsp; BY MJH &amp; CO.</div><div class="login-rings" aria-hidden="true"></div>
+</section><section class="login-content"><div class="login-caption">MJH DESK &nbsp; 品牌工作台</div>
+<form id="lf"><div class="login-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div><h2>欢迎回来</h2><p class="login-intro">输入账号和密码，<br>进入您的工作空间。</p><label for="un">账号</label><input type="text" id="un" autocomplete="username" autocapitalize="off" placeholder="输入您的账号"><label for="pw">密码</label><div class="password-wrap"><input type="password" id="pw" required autocomplete="current-password" placeholder="输入您的密码" autofocus><button type="button" id="showPassword" aria-label="显示密码" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div><div id="lerr" class="hint" style="color:var(--danger)" role="alert"></div><button class="btn" type="submit"><span>进入工作台</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button><div class="login-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>安全访问您的品牌数据</div></form>
+<div class="login-footer">忘记密码？请联系您的超级管理员重设。<span>POWERED BY MJH &amp; CO.</span></div></section></div>
 
 <div id="app" class="app hide">
   <aside class="side">
@@ -122,272 +123,11 @@ textarea{min-height:140px;resize:vertical}
     <nav class="nav" id="nav"></nav>
     <div class="foot"><span id="botst"></span><br><button id="logout">退出登入</button></div>
   </aside>
-  <main id="main"></main>
+  <section class="workspace"><header class="workspace-bar"><div><button class="mobile-open" id="mobileOpen" aria-label="打开导航" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><span class="breadcrumb-root">品牌工作空间</span><svg class="crumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><b id="breadcrumb">工作总览</b></div><div><span id="workspaceDate" class="workspace-date"></span><span class="timezone">MYT · UTC+8</span></div></header><main id="main"></main><footer class="workspace-footer"><span><b>MJH DESK</b><i></i>少一点繁琐，多一点从容。</span><span>您的品牌工作空间</span></footer></section><div class="workspace-shade"></div>
 </div>
 <div id="modalRoot"></div>
 
-<script>
-const $ = (s, r = document) => r.querySelector(s);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const ICON = {
-  overview: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
-  schedule: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
-  media: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>',
-  bot: '<svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 14h.01M15 14h.01"/></svg>',
-  log: '<svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>',
-};
-const PAGES = [["overview", "工作总览"], ["schedule", "发文排程"], ["media", "素材库"], ["bot", "机器人设置"], ["log", "操作记录"]];
-const BUILTIN = { activity_menu: "限时活动", bind_id: "领取Giftcode", checkin: "每日签到", my_points: "我的积分", lucky_draw: "幸运抽奖", referral: "邀请好友", faq_menu: "常见问题", internal_menu: "内部功能展示" };
-const STATUS = { draft: "草稿", scheduled: "已排程", sent: "已发送", failed: "发送失败" };
-
-async function api(path, opts = {}) {
-  const o = { method: opts.method || "GET", headers: {}, credentials: "same-origin" };
-  if (opts.body instanceof FormData) o.body = opts.body;
-  else if (opts.body) { o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(opts.body); }
-  const r = await fetch("/api/" + path, o);
-  const j = await r.json().catch(() => ({}));
-  if (r.status === 401 && path !== "login") { showLogin(); throw new Error("请重新登入"); }
-  if (!r.ok) throw new Error(j.error || "操作失败");
-  return j;
-}
-function toast(msg, err) {
-  const t = document.createElement("div"); t.className = "toast" + (err ? " err" : ""); t.textContent = msg;
-  document.body.appendChild(t); setTimeout(() => t.remove(), 3200);
-}
-const fmtDT = iso => iso ? new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Kuala_Lumpur", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso)) : "-";
-function toLocalInput(iso) { // ISO -> KL 时间的 datetime-local 字串
-  if (!iso) return "";
-  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(iso)).map(x => [x.type, x.value]));
-  return `${p.year}-${p.month}-${p.day}T${p.hour === "24" ? "00" : p.hour}:${p.minute}`;
-}
-const fromLocalInput = v => v ? new Date(v + ":00+08:00").toISOString() : null;
-
-/* ---------- 登入 ---------- */
-let BRAND = "";
-function showLogin() { $("#app").classList.add("hide"); $("#login").classList.remove("hide"); }
-$("#lf").onsubmit = async e => {
-  e.preventDefault();
-  try { await api("login", { method: "POST", body: { password: $("#pw").value } }); $("#lerr").textContent = ""; boot(); }
-  catch (err) { $("#lerr").textContent = err.message; }
-};
-$("#logout").onclick = async () => { await api("logout", { method: "POST" }); showLogin(); };
-
-async function boot() {
-  const me = await fetch("/api/me").then(r => r.json());
-  if (!me.authed) return showLogin();
-  BRAND = me.brand;
-  $("#wsN").textContent = BRAND; $("#wsL").textContent = BRAND[0] || "D";
-  $("#login").classList.add("hide"); $("#app").classList.remove("hide");
-  $("#nav").innerHTML = PAGES.map(([k, n]) => `<a data-p="${k}">${ICON[{ overview: "overview", schedule: "schedule", media: "media", bot: "bot", log: "log" }[k]]}${n}</a>`).join("");
-  $("#nav").onclick = e => { const a = e.target.closest("a"); if (a) location.hash = a.dataset.p; };
-  route();
-}
-window.onhashchange = () => { if (!$("#app").classList.contains("hide")) route(); };
-
-function route() {
-  const p = (location.hash || "#overview").slice(1);
-  const page = PAGES.find(x => x[0] === p) ? p : "overview";
-  document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === page));
-  ({ overview: pOverview, schedule: pSchedule, media: pMedia, bot: pBot, log: pLog })[page]();
-}
-const head = (t, s, extra = "") => `<div class="top"><div><h1>${t}</h1><p class="lead">${s}</p></div>${extra}</div>`;
-
-/* ---------- 总览 ---------- */
-let ovDays = 7, ovTab = "newUsers";
-async function pOverview() {
-  const main = $("#main");
-  const d = await api("overview?days=" + ovDays);
-  $("#botst").textContent = d.attention.botReady ? "● Bot 已连线" : "○ Bot 连线中";
-  const c = d.cards, a = d.attention;
-  const att = [];
-  if (!a.botReady) att.push(["!", "Bot 尚未连线", "检查 BOT_TOKEN 与部署 log"]);
-  if (!a.storageSet) att.push(["!", "尚未设置 STORAGE_CHAT_ID", "没有它，素材库无法上传"]);
-  if (a.failed) att.push(["!", `${a.failed} 则公告发送失败`, a.lastError]);
-  if (a.scheduled) att.push([a.scheduled, `${a.scheduled} 则公告等待发送`, "已确认排程，到点自动发出"]);
-  if (a.drafts) att.push([a.drafts, `${a.drafts} 则草稿待确认`, "确认排程后才会发送"]);
-  main.innerHTML = head("一切井然有序。", `欢迎回来。这里是 ${esc(BRAND)} 的工作概览，数据来自 bot 实际记录。`,
-    `<a class="btn" href="#schedule" onclick="setTimeout(()=>editAnn(),50)" style="text-decoration:none">＋ 新建公告</a>`) +
-    `<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><div class="seg" id="rng"><button data-d="7" class="${ovDays === 7 ? "on" : ""}">最近 7 天</button><button data-d="30" class="${ovDays === 30 ? "on" : ""}">最近 30 天</button></div></div>
-    <div class="grid4">
-      <div class="stat first"><p>新增用户</p><h2>${c.newUsers}</h2><small>期间首次启动 bot</small></div>
-      <div class="stat"><p>绑定 Giftcode</p><h2>${c.binds}</h2><small>完成游戏ID绑定</small></div>
-      <div class="stat"><p>签到人数</p><h2>${c.checkins}</h2><small>期间去重人数</small></div>
-      <div class="stat"><p>Bot 互动人数</p><h2>${c.interact}</h2><small>期间去重人数</small></div>
-    </div>
-    <div class="two">
-      <div class="card"><h3 style="margin:0">社群概况</h3><div class="tabs" id="ctabs">
-        <a data-t="newUsers" class="${ovTab === "newUsers" ? "on" : ""}">新增用户</a><a data-t="checkins" class="${ovTab === "checkins" ? "on" : ""}">签到人数</a><a data-t="interact" class="${ovTab === "interact" ? "on" : ""}">互动人数</a></div>
-        <div id="chart"></div></div>
-      <div class="card"><h3 style="margin:0 0 8px">需要您关注 <span class="chip draft">${att.length}</span></h3>
-        ${att.length ? att.map(x => `<div class="item"><div class="ic">${esc(x[0])}</div><div><b>${esc(x[1])}</b><small>${esc(x[2])}</small></div></div>`).join("") : '<div class="empty">目前没有待办事项</div>'}</div>
-    </div>`;
-  $("#rng").onclick = e => { const b = e.target.closest("button"); if (b) { ovDays = +b.dataset.d; pOverview(); } };
-  $("#ctabs").onclick = e => { const b = e.target.closest("a"); if (b) { ovTab = b.dataset.t; drawChart(d); document.querySelectorAll("#ctabs a").forEach(x => x.classList.toggle("on", x === b)); } };
-  drawChart(d);
-}
-function drawChart(d) {
-  const v = d.series[ovTab], W = 720, H = 260, P = { l: 36, r: 16, t: 14, b: 30 };
-  const max = Math.max(4, ...v), step = Math.ceil(max / 3), top = step * 3;
-  const x = i => P.l + (v.length === 1 ? 0 : i * (W - P.l - P.r) / (v.length - 1));
-  const y = n => H - P.b - n / top * (H - P.t - P.b);
-  const pts = v.map((n, i) => [x(i), y(n)]);
-  const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
-  const area = line + ` L${pts[pts.length - 1][0]} ${H - P.b} L${pts[0][0]} ${H - P.b} Z`;
-  let g = "";
-  for (let k = 0; k <= 3; k++) g += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(k * step)}" y2="${y(k * step)}" stroke="#e6e8de" stroke-dasharray="4 5"/><text x="${P.l - 8}" y="${y(k * step) + 4}" text-anchor="end" font-size="11" fill="#9aa08f">${k * step}</text>`;
-  const every = Math.ceil(v.length / 8);
-  const xl = d.labels.map((l, i) => i % every === 0 || i === v.length - 1 ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#9aa08f">${l.slice(5).replace("-", "/")}</text>` : "").join("");
-  $("#chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%"><defs><linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7f9a2c" stop-opacity=".22"/><stop offset="1" stop-color="#7f9a2c" stop-opacity="0"/></linearGradient></defs>${g}${xl}<path d="${area}" fill="url(#gr)"/><path d="${line}" fill="none" stroke="#7f9a2c" stroke-width="2.5" stroke-linejoin="round"/>${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#fff" stroke="#7f9a2c" stroke-width="2"><title>${d.labels[i]}：${v[i]}</title></circle>`).join("")}</svg>`;
-}
-
-/* ---------- 发文排程 ---------- */
-let MEDIA = [];
-async function pSchedule() {
-  const [r, m] = await Promise.all([api("announcements"), api("media")]);
-  MEDIA = m.list; window.DEFAULT_TARGET = r.defaultTarget;
-  window.ANN = r.list;
-  $("#main").innerHTML = head("发文排程", "写好内容、选素材和时间，确认排程后系统到点自动发送。", `<button class="btn" onclick="editAnn()">＋ 新建公告</button>`) +
-    `<div class="card">${r.list.length ? `<table><tr><th>标题</th><th>发布位置</th><th>计划时间（马来西亚）</th><th>素材</th><th>状态</th></tr>${r.list.map(a => `<tr class="click" onclick="editAnn('${a.id}')"><td><b>${esc(a.title || "（未命名）")}</b><br><small style="color:var(--mute)">${esc((a.text || "").slice(0, 36))}</small></td><td>${esc(a.target || "默认群组")}</td><td>${fmtDT(a.at)}</td><td>${a.mediaId ? esc((MEDIA.find(x => x.id === a.mediaId) || {}).name || "已删除") : "纯文字"}</td><td><span class="chip ${a.status}">${STATUS[a.status]}</span>${a.error ? `<br><small style="color:var(--danger)">${esc(a.error)}</small>` : ""}</td></tr>`).join("")}</table>` : '<div class="empty">还没有公告，点右上角新建第一则</div>'}</div>`;
-}
-function editAnn(id) {
-  const a = (window.ANN || []).find(x => x.id === id) || { status: "draft", text: "", title: "", target: "", mediaId: "", at: null };
-  const locked = a.status === "sent";
-  const defAt = a.at ? toLocalInput(a.at) : toLocalInput(new Date(Date.now() + 3600000).toISOString());
-  $("#modalRoot").innerHTML = `<div class="mask" id="mk"><div class="modal"><div class="l">
-    <h3>${id ? "编辑公告" : "新建公告"}</h3><p class="hint" style="margin:0 0 8px">${locked ? "已发送的公告只能查看" : "保存草稿不会发送，选择“确认排程”后到点自动发出"}</p>
-    <label>内部标题</label><input type="text" id="aT" value="${esc(a.title)}" placeholder="例如：周末服务时间公告">
-    <label>发布位置</label><input type="text" id="aG" value="${esc(a.target)}" placeholder="${window.DEFAULT_TARGET ? "留空使用默认群组" : "群组或频道 ID（例如 -100123456789）或 @频道用户名"}">
-    <label>正文</label><textarea id="aX" placeholder="写下想告诉会员的内容…">${esc(a.text)}</textarea>
-    <label>附加素材</label><select id="aM"><option value="">纯文字，不添加素材</option>${MEDIA.map(x => `<option value="${x.id}" ${x.id === a.mediaId ? "selected" : ""}>${x.type === "video" ? "视频" : "图片"}｜${esc(x.name)}</option>`).join("")}</select>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><label>计划时间（马来西亚）</label><input type="datetime-local" id="aA" value="${defAt}"></div>
-    <div><label>保存方式</label><select id="aS"><option value="draft">保存草稿</option><option value="scheduled" ${a.status === "scheduled" || a.status === "failed" ? "selected" : ""}>确认排程（到点自动发送）</option></select></div></div>
-    <div style="display:flex;gap:10px;margin-top:24px;flex-wrap:wrap">
-      ${locked ? "" : `<button class="btn" id="aSave">保存</button><button class="btn ghost" id="aTest">发送测试到我的聊天</button>`}
-      ${id ? `<button class="btn danger" id="aDel">删除</button>` : ""}<button class="btn ghost" id="aClose" style="margin-left:auto">关闭</button></div></div>
-    <div class="r"><div style="font-size:12px;letter-spacing:.15em;color:var(--mute)">TELEGRAM 预览</div><div class="tg"><div class="hd"><i>${esc((BRAND || "D")[0])}</i><div><b>${esc(BRAND)}</b><br><small style="color:var(--mute)">公告频道</small></div></div><div class="bd"><div class="bub" id="pv"></div></div></div>
-    <p class="hint">预览为示意，实际显示以 Telegram 为准。</p></div></div></div>`;
-  const pv = () => {
-    const m = MEDIA.find(x => x.id === $("#aM").value), t = $("#aX").value;
-    $("#pv").innerHTML = (m ? (m.type === "photo" ? `<img src="/api/media/${m.id}/file">` : `<div class="vid">视频：${esc(m.name)}</div>`) : "") + (t ? esc(t) : '<span style="color:#9aa">您的公告内容会出现在这里。</span>') + `<div class="tm">${($("#aA").value || "12:00").slice(-5)} ✓✓</div>`;
-  };
-  ["aX", "aM", "aA"].forEach(k => $("#" + k).addEventListener("input", pv)); pv();
-  const close = () => $("#modalRoot").innerHTML = "";
-  $("#aClose").onclick = close; $("#mk").onclick = e => { if (e.target.id === "mk") close(); };
-  const body = () => ({ id, title: $("#aT").value, target: $("#aG").value, text: $("#aX").value, mediaId: $("#aM").value, at: fromLocalInput($("#aA").value), status: $("#aS").value });
-  if (!locked) {
-    $("#aSave").onclick = async () => { try { await api("announcements", { method: "POST", body: body() }); toast("已保存"); close(); pSchedule(); } catch (e) { toast(e.message, 1); } };
-    $("#aTest").onclick = async () => { try { await api("announcements/test", { method: "POST", body: { text: $("#aX").value, mediaId: $("#aM").value } }); toast("测试已发到你的聊天"); } catch (e) { toast(e.message, 1); } };
-  }
-  if (id) $("#aDel").onclick = async () => { if (confirm("确定删除这则公告？")) { await api("announcements/" + id, { method: "DELETE" }); close(); pSchedule(); } };
-}
-
-/* ---------- 素材库 ---------- */
-async function pMedia() {
-  const r = await api("media");
-  $("#main").innerHTML = head("素材库", "上传图片或视频，系统自动转换成 Telegram 可直接使用的格式，发送时不需要再下载。", `<div><input type="file" id="up" accept="image/*,video/*" class="hide" multiple><button class="btn" id="upb">＋ 上传素材</button></div>`) +
-    (r.list.length ? `<div class="media">${r.list.map(m => `<div class="mi"><div class="th">${m.type === "photo" ? `<img src="/api/media/${m.id}/file" loading="lazy">` : "视频"}</div><div class="in"><div class="nm">${esc(m.name)}</div><div style="color:var(--mute);margin:2px 0 8px">${m.type === "video" ? "视频" : "图片"} · ${(m.size / 1048576).toFixed(1)}MB</div><button class="btn danger sm" onclick="delMedia('${m.id}')">删除</button></div></div>`).join("")}</div>` : '<div class="card empty">素材库是空的，上传第一个素材吧</div>');
-  $("#upb").onclick = () => $("#up").click();
-  $("#up").onchange = async e => {
-    for (const f of e.target.files) {
-      const fd = new FormData(); fd.append("file", f);
-      toast("上传中：" + f.name);
-      try { await api("media", { method: "POST", body: fd }); toast("已完成：" + f.name); } catch (err) { toast(f.name + "：" + err.message, 1); }
-    }
-    pMedia();
-  };
-}
-async function delMedia(id) { if (confirm("确定删除这个素材？已排程的公告若使用它会发送失败。")) { await api("media/" + id, { method: "DELETE" }); pMedia(); } }
-
-/* ---------- 机器人设置 ---------- */
-let CFG, PHOTOS = [], botTab = "menu";
-async function pBot() {
-  const [c, p] = await Promise.all([api("config"), api("media-ids")]);
-  CFG = c; PHOTOS = p.list;
-  renderBot();
-}
-function photoSel(id, val) {
-  return `<select id="${id}"><option value="">不放图片</option>${PHOTOS.map(p => `<option value="${esc(p.fileId)}" ${p.fileId === val ? "selected" : ""}>${esc(p.name)}</option>`).join("")}${val && !PHOTOS.find(p => p.fileId === val) ? `<option value="${esc(val)}" selected>（沿用现有图片）</option>` : ""}</select>`;
-}
-function renderBot() {
-  const tabs = [["menu", "菜单按钮"], ["welcome", "欢迎页"], ["faq", "常见问题"], ["activity", "限时活动"]];
-  $("#main").innerHTML = head("机器人设置", "这里的每一项修改，保存后 bot 立即生效，不需要重新部署。") +
-    `<div class="card"><div class="tabs" id="bt">${tabs.map(([k, n]) => `<a data-t="${k}" class="${botTab === k ? "on" : ""}">${n}</a>`).join("")}</div><div id="bp"></div></div>`;
-  $("#bt").onclick = e => { const a = e.target.closest("a"); if (a) { botTab = a.dataset.t; renderBot(); } };
-  ({ menu: tabMenu, welcome: tabWelcome, faq: tabFaq, activity: tabActivity })[botTab]();
-}
-const saveBtn = fn => { $("#sv").onclick = async () => { try { await fn(); toast("已保存，bot 已同步"); } catch (e) { toast(e.message, 1); } }; };
-
-function tabMenu() {
-  const rows = CFG.menu;
-  const kbPreview = () => rows.map(r => `<div>${r.map(b => `<span class="${b.enabled === false ? "off" : ""}">${esc(b.label || "（未命名）")}</span>`).join("")}</div>`).join("");
-  $("#bp").innerHTML = `<div style="display:grid;grid-template-columns:1fr 340px;gap:24px" class="mgrid"><div id="mrows">${rows.map((r, ri) => `
-    <div class="row"><div class="rowctl"><button onclick="mvRow(${ri},-1)">↑</button><button onclick="mvRow(${ri},1)">↓</button><button onclick="rmRow(${ri})">×</button></div><div>
-    ${r.map((b, bi) => btnCard(b, ri, bi)).join("")}${r.length < 3 ? `<button class="btn ghost sm" onclick="addBtn(${ri})">＋ 同一行加按钮</button>` : ""}</div></div>`).join("")}
-    <button class="btn ghost" onclick="addRow()">＋ 新增一行</button> <button class="btn" id="sv" style="margin-left:8px">保存并同步</button></div>
-    <div><div style="font-size:12px;letter-spacing:.15em;color:var(--mute)">主菜单预览</div><div class="tg"><div class="bd" style="min-height:0"><div class="bub">欢迎加入 ${esc(CFG.brand)}…</div><div class="kb" id="kbp">${kbPreview()}</div></div></div></div></div>`;
-  $("#mrows").addEventListener("input", syncMenu);
-  $("#mrows").addEventListener("change", e => { syncMenu(); if (e.target.dataset.rr) tabMenu(); });
-  saveBtn(async () => { syncMenu(); await api("menu", { method: "PUT", body: { menu: CFG.menu } }); });
-}
-function btnCard(b, ri, bi) {
-  const k = `${ri}-${bi}`;
-  return `<div class="bcard" data-k="${k}"><div class="g"><input type="text" data-f="label" value="${esc(b.label)}" placeholder="按钮文字">
-  <select data-f="type" data-rr="1"><option value="builtin" ${b.type === "builtin" ? "selected" : ""}>内置功能</option><option value="text" ${b.type === "text" ? "selected" : ""}>文字内容页</option><option value="link" ${b.type === "link" ? "selected" : ""}>外部链接</option></select></div>
-  ${b.type === "builtin" ? `<select data-f="action" style="margin-top:10px">${Object.entries(BUILTIN).map(([v, n]) => `<option value="${v}" ${b.action === v ? "selected" : ""}>${n}</option>`).join("")}</select>` : ""}
-  ${b.type === "text" ? `<textarea data-f="content" style="margin-top:10px;min-height:90px" placeholder="点击按钮后显示的内容">${esc(b.content || "")}</textarea><div style="margin-top:8px">${photoSel("img" + k, b.imageId || "").replace("<select", '<select data-f="imageId"')}</div>` : ""}
-  ${b.type === "link" ? `<input type="text" data-f="url" style="margin-top:10px" value="${esc(b.url || "")}" placeholder="https://…">` : ""}
-  <div style="display:flex;justify-content:space-between;margin-top:10px"><label style="margin:0;font-weight:500"><input type="checkbox" data-f="enabled" ${b.enabled !== false ? "checked" : ""}> 显示此按钮</label><button class="btn danger sm" onclick="rmBtn(${ri},${bi})">删除按钮</button></div></div>`;
-}
-function syncMenu() {
-  document.querySelectorAll(".bcard").forEach(card => {
-    const [ri, bi] = card.dataset.k.split("-").map(Number), b = CFG.menu[ri] && CFG.menu[ri][bi]; if (!b) return;
-    card.querySelectorAll("[data-f]").forEach(el => { b[el.dataset.f] = el.type === "checkbox" ? el.checked : el.value; });
-    if (b.type === "builtin" && !b.action) b.action = "checkin";
-  });
-  const kb = $("#kbp"); if (kb) kb.innerHTML = CFG.menu.map(r => `<div>${r.map(b => `<span class="${b.enabled === false ? "off" : ""}">${esc(b.label || "（未命名）")}</span>`).join("")}</div>`).join("");
-}
-const nid = () => Math.random().toString(36).slice(2, 10);
-function mvRow(i, d) { syncMenu(); const j = i + d; if (j < 0 || j >= CFG.menu.length) return; [CFG.menu[i], CFG.menu[j]] = [CFG.menu[j], CFG.menu[i]]; tabMenu(); }
-function rmRow(i) { if (confirm("删除这一整行按钮？")) { syncMenu(); CFG.menu.splice(i, 1); tabMenu(); } }
-function rmBtn(ri, bi) { syncMenu(); CFG.menu[ri].splice(bi, 1); if (!CFG.menu[ri].length) CFG.menu.splice(ri, 1); tabMenu(); }
-function addBtn(ri) { syncMenu(); CFG.menu[ri].push({ id: nid(), label: "新按钮", type: "text", content: "", enabled: true }); tabMenu(); }
-function addRow() { syncMenu(); CFG.menu.push([{ id: nid(), label: "新按钮", type: "text", content: "在这里写点击后显示的内容", enabled: true }]); tabMenu(); }
-
-function tabWelcome() {
-  $("#bp").innerHTML = `<label style="margin-top:0">欢迎页图片</label>${photoSel("wI", CFG.welcome.imageId)}<p class="hint">图片来自素材库。没有选择则只发文字。</p>
-  <label>欢迎文字</label><textarea id="wC" style="min-height:200px">${esc(CFG.welcome.caption)}</textarea><p class="hint">可用 {brand} 代表品牌名，{count} 代表今日签到人数。</p>
-  <button class="btn" id="sv" style="margin-top:14px">保存并同步</button>`;
-  saveBtn(() => api("welcome", { method: "PUT", body: { imageId: $("#wI").value, caption: $("#wC").value } }));
-}
-function tabFaq() {
-  const draw = () => {
-    $("#bp").innerHTML = `${CFG.faq.map((f, i) => `<div class="bcard"><input type="text" data-i="${i}" data-f="title" value="${esc(f.title)}" placeholder="问题标题（会显示在按钮上）"><textarea data-i="${i}" data-f="text" style="margin-top:10px;min-height:90px">${esc(f.text)}</textarea><div style="text-align:right;margin-top:8px"><button class="btn danger sm" onclick="rmFaq(${i})">删除</button></div></div>`).join("")}
-    <button class="btn ghost" onclick="addFaq()">＋ 新增问题</button> <button class="btn" id="sv" style="margin-left:8px">保存并同步</button>`;
-    $("#bp").oninput = e => { const i = e.target.dataset.i; if (i != null) CFG.faq[i][e.target.dataset.f] = e.target.value; };
-    saveBtn(() => api("faq", { method: "PUT", body: { faq: CFG.faq } }));
-  };
-  window.rmFaq = i => { CFG.faq.splice(i, 1); draw(); };
-  window.addFaq = () => { CFG.faq.push({ id: nid(), title: "新问题", text: "" }); draw(); };
-  draw();
-}
-function tabActivity() {
-  const a = CFG.activity;
-  $("#bp").innerHTML = `<label style="margin-top:0"><input type="checkbox" id="aE" ${a.enabled ? "checked" : ""}> 启用活动页</label>
-  <label>活动标题</label><input type="text" id="aTi" value="${esc(a.title)}">
-  <label>活动内容</label><textarea id="aBo">${esc(a.body)}</textarea>
-  <label>活动图片</label>${photoSel("aIm", a.imageId)}
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px"><div><label>结束时间（马来西亚）</label><input type="datetime-local" id="aEn" value="${toLocalInput(a.endAt)}"></div><div><label>目标金额 RM</label><input type="number" id="aGo" value="${a.goal}"></div><div><label>大奖名称</label><input type="text" id="aPr" value="${esc(a.prize)}"></div></div>
-  <button class="btn" id="sv" style="margin-top:18px">保存并同步</button>`;
-  saveBtn(() => api("activity", { method: "PUT", body: { activity: { enabled: $("#aE").checked, title: $("#aTi").value, body: $("#aBo").value, imageId: $("#aIm").value, endAt: fromLocalInput($("#aEn").value), goal: +$("#aGo").value, prize: $("#aPr").value } } }));
-}
-
-/* ---------- 操作记录 ---------- */
-async function pLog() {
-  const r = await api("log");
-  $("#main").innerHTML = head("操作记录", "后台上的每一次修改都会留下记录。") + `<div class="card">${r.list.length ? `<table><tr><th>时间</th><th>操作</th><th>内容</th></tr>${r.list.map(l => `<tr><td>${fmtDT(l.t)}</td><td><b>${esc(l.action)}</b></td><td>${esc(l.detail)}</td></tr>`).join("")}</table>` : '<div class="empty">还没有记录</div>'}</div>`;
-}
-
-boot();
-</script>
+<script src="/app.js"></script>
+<script src="/mjh-ui.js"></script>
 </body>
 </html>

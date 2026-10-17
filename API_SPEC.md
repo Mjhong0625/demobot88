@@ -4,17 +4,26 @@
 
 ## 通用规则
 - 所有接口前缀 `/api/`，请求与回应都是 JSON（上传素材除外）。
-- 认证：登入成功后浏览器自动带 cookie（`mjh_session`，HttpOnly），前端不用自己存 token。除了 `/api/login`、`/api/me`，其他接口未登入都回 `401 {"error":"未登入"}`，前端收到 401 要跳回登入页。
-- 失败统一回 `4xx/5xx {"error":"中文错误信息"}`，前端直接把 `error` 显示给用户即可。
-- 时间：后端存 ISO 字串（UTC）。界面一律显示马来西亚时间（UTC+8）。送出时间时，把用户选的马来西亚时间转成 ISO 再传。
-- 前端使用 `fetch(..., {credentials:"same-origin"})`。
+- 认证：账号 + 密码登入，浏览器自动带 HttpOnly cookie。除了 `/api/login`、`/api/me`，其他接口未登入回 `401`，没有权限回 `403 {"error":"你的账号没有权限执行此操作"}`，前端把 `error` 显示给用户即可。
+- 时间：后端存 ISO（UTC），界面一律显示马来西亚时间（UTC+8）。
+- 每个品牌是一个独立部署（一个 bot 一个后台），品牌内有两种角色：
+  - `super_admin` 超级管理员：全部功能，包括员工账号、机器人设置、发布位置、操作记录
+  - `admin` 管理员：总览、发文排程、素材库（不能改机器人设置、员工、发布位置，看不到操作记录）
+- 系统账号 `owner`（`system:true`）：密码由服务器变量 `ADMIN_PASSWORD` 控制，不能被停用、删除或在后台改密码，是技术支持的恢复入口。
 
 ## 认证
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/login` | body `{password}`，成功 `{ok:true}`；密码错 401；错太多次 429 |
-| POST | `/api/logout` | 清除登入 |
-| GET | `/api/me` | `{authed:boolean, brand:string}`，页面载入时先调这个决定显示登入页还是后台 |
+| POST | `/api/login` | body `{username, password}`，username 留空等于 `owner`；错 401，停用 403，错太多次 429 |
+| POST | `/api/logout` | |
+| GET | `/api/me` | `{authed, brand, user:{id,username,displayName,role,roleLabel}, can:{bot,users,log,targetsEdit}, mediaTtlDays}`，前端用 `can` 决定显示哪些页面 |
+| POST | `/api/me/password` | body `{oldPassword,newPassword}`（至少 8 位），owner 不可用 |
+
+## 员工账号（仅超级管理员）
+- `GET /api/users` → `{list:[{id,username,displayName,role,roleLabel,active,system,isSelf,createdAt,lastLoginAt}]}`
+- `POST /api/users` body `{username(3-24位小写英数._-), displayName, role:"admin"|"super_admin", password(>=8)}`
+- `PUT /api/users/:id` body 任意组合 `{displayName, role, active, password}`；password 留空不改。规则：不能停用/降级自己；至少保留一位启用中的超级管理员；系统账号不可改。停用或重设密码会立即踢下线。
+- `DELETE /api/users/:id`：不能删自己和系统账号。
 
 ## 总览
 `GET /api/overview?days=7|30`
@@ -31,39 +40,38 @@
 - `series`：与 `labels` 等长，用来画趋势图（三个页签切换）。
 - `attention`：驱动「需要您关注」列表。`botReady=false` 或 `storageSet=false` 要显示警示；`failed>0` 显示 `lastError`。
 
+## 发布位置（常用群组/频道）
+- `GET /api/targets`（所有人）→ `{list:[{id,name,chatId}]}`，管理员看不到 `chatId`。发文时下拉选名称。
+- `PUT /api/targets`（仅超级管理员）body `{targets:[{id?,name,chatId}]}`，整份覆盖。`chatId` 格式：`@频道用户名` 或数字 ID（如 `-100123456789`）。
+- `POST /api/targets/check`（所有人）body `{chatId}` → `{ok,title,type,canPost,message}`；连不上回 400 并带说明。用于「测试连接」按钮。
+
 ## 发文排程（公告）
-**列表** `GET /api/announcements` → `{ list: Announcement[], defaultTarget: string }`
-
-Announcement：
+`GET /api/announcements` → `{list:[Announcement], defaultTarget}`
 ```json
-{ "id":"", "title":"", "target":"", "text":"", "mediaId":"", "at":"ISO或null",
-  "status":"draft|scheduled|sent|failed", "error":"", "sentAt":"ISO", "createdAt":"ISO" }
+{ "id":"", "title":"", "targetId":"", "targetName":"", "text":"", "mediaId":"", "mediaMissing":false,
+  "at":"ISO或null", "status":"draft|scheduled|sent|failed", "error":"", "createdBy":"", "updatedBy":"" }
 ```
-- `status`：`draft` 草稿；`scheduled` 已确认排程，到点自动发送；`sent` 已发送（不可再修改）；`failed` 发送失败（`error` 有原因，修改后重新「确认排程」可重发）。
-- `target` 为空表示使用 `defaultTarget`；`defaultTarget` 也为空时，前端提示用户必须填发布位置。
-
-**新增/修改** `POST /api/announcements`，body：
+`POST /api/announcements`（新增/修改）body：
 ```json
-{ "id":"（修改时带，新增不带）", "title":"", "target":"", "text":"", "mediaId":"", "at":"ISO", "status":"draft|scheduled" }
+{ "id":"（修改才带）", "title":"（选填，不填自动取正文开头）", "targetId":"", "text":"", "mediaId":"",
+  "status":"draft|scheduled", "at":"ISO", "sendNow":false }
 ```
-- 必须有 `text` 或 `mediaId` 其一。
-- `status:"scheduled"` 时 `at` 必填。已发送的公告再修改会回 400。
-- 回 `{ok:true, announcement}`。
+- 三种发送方式：**存草稿** `status:"draft"`；**定时发送** `status:"scheduled"` + `at`；**立即发送** `sendNow:true`（后端立刻触发，通常 1 到 2 秒内发出，不需要 at）。
+- 校验（失败回 400 中文说明）：正文和素材至少一个；定时/立即必须选发布位置；定时的时间不能是过去（超过 1 分钟前）；素材必须存在；已发送的公告不能修改（前端提供「复制」另建一则）。
+- `DELETE /api/announcements/:id`
+- `POST /api/announcements/test` body `{text, mediaId}`：发到管理员自己的 Telegram（服务器需设 STORAGE_CHAT_ID）。
 
-**删除** `DELETE /api/announcements/:id`
+界面要点：发文窗口是一步到位：选发布位置、写正文、点选或拖入图片/视频（上传后自动存入素材库并选中）、三选一发送方式。
 
-**发送测试** `POST /api/announcements/test`，body `{text, mediaId}`，发到管理员自己的聊天（需要后端设了 STORAGE_CHAT_ID，否则回 400 说明原因）。
+## 素材库（保留 30 天自动清理）
+- `GET /api/media` → `{list:[{id,name,type,size,createdAt,uploadedBy,expiresAt,daysLeft,inUse,inUseReason}], ttlDays}`。`inUse=true` 表示被排程/草稿或机器人设置使用中，不会被清理也不能删除。
+- `POST /api/media` multipart 字段 `file`，图片 <=10MB、视频 <=50MB，一次一个文件。成功回 `{ok,item}`（同上格式）。**发文窗口里直接上传也是调用这个接口**，所以自动进入素材库。
+- `POST /api/media/:id/extend`：到期时间重置为现在起 30 天。
+- `DELETE /api/media/:id`：被使用中回 409 并说明原因。
+- `GET /api/media/:id/file`：图片缩图（视频 404）。
+- 说明：文件本体存在 Telegram，服务器只存记录，所以清理的是记录和 Telegram 里的存放消息，不占服务器硬盘。清理每小时跑一次。
 
-界面建议：弹窗编辑，左边表单，右边 Telegram 气泡预览（正文、图片/视频、时间）。保存方式下拉：保存草稿 / 确认排程。
-
-## 素材库
-- `GET /api/media` → `{ list:[{id,name,type:"photo"|"video",size,createdAt}] }`
-- `POST /api/media`：`multipart/form-data`，字段名 `file`。成功 `{ok:true,item:{id,name,type,fileId}}`。只收图片和视频；图片 ≤10MB，视频 ≤50MB；一次上传一个文件，多文件请逐个调用并显示进度。
-- `DELETE /api/media/:id`
-- `GET /api/media/:id/file`：图片缩图（只有 `type=photo` 有，视频回 404，前端用占位图标）。需要登入 cookie，可直接放进 `<img src>`。
-- `GET /api/media-ids` → `{ list:[{id,name,fileId}] }`，仅图片，给「菜单按钮/欢迎页/活动」选图用。选图时存的值是 `fileId`，不是 `id`。
-
-## 机器人设置
+## 机器人设置（仅超级管理员）
 **读取** `GET /api/config`
 ```json
 { "brand":"", "welcome":{"imageId":"","caption":""}, "menu":[[Button,...],...],
@@ -90,12 +98,23 @@ Button = { "id":"", "label":"按钮文字", "type":"builtin|text|link", "enabled
 { "activity": { "enabled":true, "title":"", "body":"", "imageId":"", "endAt":"ISO", "goal":500, "prize":"" } }
 ```
 
-## 操作记录
-`GET /api/log` → `{ list:[{t:毫秒时间戳, action, detail}] }`，最近 100 条。
+## 机器人资料（仅超级管理员，直接同步到 Telegram）
+用户在 Telegram 里看到的名称、头像、简介、说明、命令菜单，都能在后台改，不需要去 BotFather。数据以 Telegram 上的为准（每次打开页面都实时读取）。
+- `GET /api/bot-profile` → `{username, name, shortDescription, description, commands:[{command,description}], readOk}`。`readOk=false` 表示暂时读不到 Telegram 上的现有资料，界面要提醒「保存会覆盖」。
+- `PUT /api/bot-profile` body `{name, shortDescription, description, commands}`。校验（400）：名称必填且 <=64；简介 <=120；说明 <=512；命令名只能英文小写/数字/下划线、<=32 字、说明必填 <=256、不可重复（开头的 `/` 会自动去掉）。后端只提交有变化的项目，回应：
+  ```json
+  { "ok": false, "results": { "name": {"ok":true,"skipped":true}, "shortDescription": {"ok":true}, "description": {"ok":false,"error":"中文原因"}, "commands": {"ok":true,"skipped":true} } }
+  ```
+  `skipped` 表示没有变化。某一项失败不影响其他项（例如改名字被 Telegram 限频）。界面要逐项显示成功/失败原因。
+- `POST /api/bot-profile/avatar` multipart 字段 `file`（图片，<=5MB，建议正方形 JPG）；`DELETE /api/bot-profile/avatar` 移除；`GET /api/bot-profile/avatar` 取目前头像图片（没有头像或取不到回 404，前端显示首字占位）。
+- 不能改的：机器人的 `@用户名`（Telegram 限制，只能在 BotFather）。界面里只显示、不提供编辑。
+- 改名字有 Telegram 的频率限制，界面要提示「不要频繁修改」。
 
-## 页面清单（沿用现有 5 页）
-工作总览 / 发文排程 / 素材库 / 机器人设置（菜单按钮、欢迎页、常见问题、限时活动四个页签）/ 操作记录。
-另有登入页。配色与 logo：MJH & Co，黑绿品牌色，荧光绿 `#C8FF00` 为主色。
+## 操作记录（仅超级管理员）
+`GET /api/log` → `{ list:[{t:毫秒时间戳, by:操作人, action, detail}] }`，最近 150 条。
 
-## 参考实现
-`public/index.html` 是目前可运行的完整版本，所有接口调用方式都在里面，GPT 可以直接参考或在它基础上美化，但要保持接口调用不变。
+## 页面清单
+工作总览 / 发文排程 / 素材库（所有人）；机器人设置（含机器人资料、菜单按钮、欢迎页、常见问题、限时活动、发布位置六个页签，默认打开「机器人资料」）/ 员工与权限 / 操作记录（仅超级管理员）。另有登入页。
+
+## 分工与参考实现
+前端分工见 `README-UI.md`。`public/app.js` 是 Claude 维护的交互逻辑，包含所有接口调用的写法。
