@@ -11,8 +11,9 @@ const TTL_DAYS = Math.max(1, Number(process.env.MEDIA_TTL_DAYS) || 30);
 const PERMS = {
   super_admin: ["content", "bot", "users", "log", "targets_edit"],
   admin: ["content"],
+  guest: ["content", "bot", "log"], // 访客：可以看到所有内容页面，但全部只读（见下方 readOnlyGuard）
 };
-const ROLE_LABEL = { super_admin: "超级管理员", admin: "管理员" };
+const ROLE_LABEL = { super_admin: "超级管理员", admin: "管理员", guest: "访客（只读）" };
 
 function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BOT_TOKEN }) {
   const app = express();
@@ -74,6 +75,16 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
   const need = (perm) => [guard, (req, res, next) => (can(req.user, perm) ? next() : res.status(403).json({ error: "你的账号没有权限执行此操作" }))];
 
   app.use(express.json({ limit: "1mb" }));
+
+  // 访客只读：除登入/登出和「测试连接」外，所有写入类请求一律拒绝
+  const GUEST_OK = new Set(["/api/login", "/api/logout", "/api/targets/check"]);
+  app.use("/api", (req, res, next) => {
+    if (req.method === "GET" || req.method === "HEAD") return next();
+    if (GUEST_OK.has(req.originalUrl.split("?")[0])) return next();
+    const u = userFromReq(req);
+    if (u && u.role === "guest") return res.status(403).json({ error: "访客账号只能查看，不能修改" });
+    next();
+  });
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
   app.get("/health", (req, res) => res.type("text").send(`ok | bot: ${isReady() ? "connected" : "connecting"}`));
@@ -112,6 +123,7 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
       brand: D().brand,
       user: u ? publicUser(u) : null,
       can: u ? { bot: can(u, "bot"), users: can(u, "users"), log: can(u, "log"), targetsEdit: can(u, "targets_edit") } : null,
+      readonly: !!u && u.role === "guest",
       mediaTtlDays: TTL_DAYS,
     });
   });
@@ -518,7 +530,7 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
       name: n.status === "fulfilled" ? n.value.name : "",
       shortDescription: s.status === "fulfilled" ? s.value.short_description : "",
       description: d.status === "fulfilled" ? d.value.description : "",
-      commands: c.status === "fulfilled" ? c.value.map((x) => ({ command: x.command, description: x.description })) : [],
+      commands: c.status === "fulfilled" && Array.isArray(c.value) ? c.value.map((x) => ({ command: x.command, description: x.description })) : [],
       readOk: [n, s, d, c].every((x) => x.status === "fulfilled"),
     });
   });
@@ -585,7 +597,7 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
     catch (e) { res.status(400).json({ error: "移除失败：" + tgErr(e) }); }
   });
   // 目前头像（尽力而为：取不到就让前端显示占位图）
-  app.get("/api/bot-profile/avatar", need("bot"), async (req, res) => {
+  app.get("/api/bot-profile/avatar", need("content"), async (req, res) => {
     try {
       const me = bot.botInfo || (await bot.telegram.getMe());
       const ph = await bot.telegram.getUserProfilePhotos(me.id, 0, 1);

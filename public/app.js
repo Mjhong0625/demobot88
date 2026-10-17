@@ -12,7 +12,7 @@ const ICON = {
 const ALL_PAGES = [["overview", "工作总览", "overview"], ["schedule", "发文排程", "schedule"], ["media", "素材库", "media"], ["bot", "机器人设置", "bot"], ["staff", "员工与权限", "staff"], ["log", "操作记录", "log"]];
 const BUILTIN = { activity_menu: "限时活动", bind_id: "领取Giftcode", checkin: "每日签到", my_points: "我的积分", lucky_draw: "幸运抽奖", referral: "邀请好友", faq_menu: "常见问题", internal_menu: "内部功能展示" };
 const STATUS = { draft: "草稿", scheduled: "待发送", sent: "已发送", failed: "发送失败" };
-const ROLE_DESC = { super_admin: "可以管理员工账号、机器人设置、发布位置，以及发文和素材", admin: "负责日常发文和素材，不能改机器人设置和员工账号" };
+const ROLE_DESC = { super_admin: "可以管理员工账号、机器人设置、发布位置，以及发文和素材", admin: "负责日常发文和素材，不能改机器人设置和员工账号", guest: "只能查看所有页面内容，不能修改任何东西，适合给潜在客户或同事浏览" };
 
 let ME = null, BRAND = "", PAGES = ALL_PAGES.slice(0, 3);
 
@@ -54,6 +54,26 @@ function tomorrowAt(h, mi) { // 明天某时某分（马来西亚时间）
   return `${x.getUTCFullYear()}-${p(x.getUTCMonth() + 1)}-${p(x.getUTCDate())}T${p(x.getUTCHours())}:${p(x.getUTCMinutes())}`;
 }
 
+/* ---------- 访客只读：禁用输入、隐藏会修改数据的按钮（服务器端同样会拒绝写入） ---------- */
+const RO_HIDE = /^[＋+]|保存|发送|排程|新建|新增|添加|删除|移除|上传|延长|复制|重设|更换|确认|测试|发给我|选择文件|从素材库选择|立即|草稿/;
+function applyReadonly() {
+  if (!ME || !ME.readonly) return;
+  const main = $("#main"), mod = $("#modalRoot");
+  [main, mod].forEach(root => {
+    if (!root) return;
+    root.querySelectorAll("input,select,textarea").forEach(el => { if (!el.disabled) el.disabled = true; });
+    root.querySelectorAll("button,.btn,label.x-drop,.x-drop").forEach(el => {
+      if (el.closest("#nav")) return;
+      if (RO_HIDE.test(el.textContent || "") && !/^(关闭|取消|返回)$/.test((el.textContent || "").trim())) el.style.display = "none";
+    });
+  });
+  if (main && !main.querySelector(".x-guest-note")) main.insertAdjacentHTML("afterbegin", '<div class="x-guest-note">访客模式：可以查看所有内容，但不能修改。</div>');
+}
+function startReadonly() {
+  const mo = new MutationObserver(() => applyReadonly());
+  ["#main", "#modalRoot"].forEach(sel => { const el = $(sel); if (el) mo.observe(el, { childList: true, subtree: true }); });
+}
+
 /* ---------- 登入 ---------- */
 function showLogin() { $("#app").classList.add("hide"); $("#login").classList.remove("hide"); }
 $("#lf").onsubmit = async e => {
@@ -76,6 +96,8 @@ async function boot() {
   if (foot && !$("#who")) foot.insertAdjacentHTML("afterbegin", `<div id="who" class="x-who"></div>`);
   $("#who").innerHTML = `<b>${esc(me.user.displayName)}</b><span>${esc(me.user.roleLabel)}</span><button id="chgpw" type="button">修改密码</button>`;
   $("#chgpw").onclick = changePassword;
+  document.body.classList.toggle("x-ro", !!me.readonly);
+  if (me.readonly) { $("#chgpw").remove(); startReadonly(); }
   route();
 }
 window.onhashchange = () => { if (!$("#app").classList.contains("hide")) route(); };
@@ -493,7 +515,7 @@ async function pStaff() {
   const r = await api("users");
   window.USERS = r.list;
   $("#main").innerHTML = head("员工与权限", "为你的团队开设账号。每个人用自己的账号登入，操作记录会留下是谁做的。", `<button class="btn" onclick="editUser()">＋ 新增员工</button>`) +
-    `<div class="x-roles"><div><b>超级管理员</b><small>${ROLE_DESC.super_admin}</small></div><div><b>管理员</b><small>${ROLE_DESC.admin}</small></div></div>` +
+    `<div class="x-roles"><div><b>超级管理员</b><small>${ROLE_DESC.super_admin}</small></div><div><b>管理员</b><small>${ROLE_DESC.admin}</small></div><div><b>访客（只读）</b><small>${ROLE_DESC.guest}</small></div></div>` +
     `<div class="card"><table><tr><th>姓名</th><th>账号</th><th>角色</th><th>状态</th><th>最近登入</th><th></th></tr>${r.list.map(u => `<tr><td><b>${esc(u.displayName)}</b>${u.isSelf ? ' <span class="chip draft">我</span>' : ""}${u.system ? ' <span class="chip draft">系统账号</span>' : ""}</td><td>${esc(u.username)}</td><td>${esc(u.roleLabel)}</td><td><span class="chip ${u.active ? "sent" : "failed"}">${u.active ? "启用中" : "已停用"}</span></td><td>${fmtDT(u.lastLoginAt)}</td><td style="text-align:right">${u.system ? '<small style="color:var(--mute)">由技术支持管理</small>' : `<button class="btn ghost sm" onclick="editUser('${u.id}')">编辑</button>`}</td></tr>`).join("")}</table></div>`;
 }
 function editUser(id) {
@@ -501,7 +523,7 @@ function editUser(id) {
   openModal(`<div class="mask" id="mk"><div class="modal x-narrow"><div class="l"><h3>${id ? "编辑员工" : "新增员工"}</h3>
     <label>姓名</label><input type="text" id="uN" value="${esc(u.displayName)}" placeholder="例如：Amy">
     <label>登入账号</label><input type="text" id="uU" value="${esc(u.username)}" ${id ? "disabled" : ""} placeholder="英文小写或数字，例如 amy" autocapitalize="off">
-    <label>角色</label><select id="uR"><option value="admin" ${u.role === "admin" ? "selected" : ""}>管理员</option><option value="super_admin" ${u.role === "super_admin" ? "selected" : ""}>超级管理员</option></select>
+    <label>角色</label><select id="uR"><option value="admin" ${u.role === "admin" ? "selected" : ""}>管理员</option><option value="super_admin" ${u.role === "super_admin" ? "selected" : ""}>超级管理员</option><option value="guest" ${u.role === "guest" ? "selected" : ""}>访客（只读）</option></select>
     <div class="hint" id="uRD"></div>
     <label>${id ? "重设密码（不改就留空）" : "登入密码（至少 8 个字符）"}</label><input type="password" id="uP" autocomplete="new-password">
     ${id ? `<label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="uA" ${u.active ? "checked" : ""}> 账号启用中（取消勾选即停用，对方立刻被登出）</label>` : ""}

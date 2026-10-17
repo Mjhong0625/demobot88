@@ -48,3 +48,6 @@
 .x-pv2{background:#dfe6d6;border:0}
 .x-start{margin-top:12px;background:#fff;border-radius:10px;padding:8px 40px;font-weight:600;color:#3a7bd5}
 @media(max-width:1000px){.x-prof{grid-template-columns:1fr}.x-crow{grid-template-columns:14px 1fr}.x-crow input:nth-of-type(2),.x-crow button{grid-column:2}}
+
+.x-guest-note{background:#f1f5e4;border:1px solid #d8e2b8;color:#4b5a2a;border-radius:12px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+body.x-ro .x-drop,body.x-ro [data-act],body.x-ro .x-modes{pointer-events:none}

@@ -17,3 +17,33 @@
 
 ## 想新增页面或功能怎么办
 先告诉 Claude，由 Claude 在 `admin.js` 加接口、在 `app.js` 加交互，GPT 再美化。
+
+## V4 UI 完成版（2026-10-17）
+
+本次变更仅限 public/index.html、public/mjh-ui.css、public/mjh-ui.js。
+保留 public/app.js、public/app.css、admin.js、bot.js、store.js 原始字节。
+
+- 延续黑色侧栏、米白内容区、荧光绿主操作；提高辅助文字对比。
+- 统一员工权限卡片、机器人资料预览、发布位置、素材及发文编辑器。
+- 手机端按钮和输入框尺寸优化；表格横向滚动，预览自适应排列。
+- 移除数据卡片固定上升箭头，避免未计算增长率却暗示增长。
+- 弹窗添加对话框语义、焦点限制与关闭后的焦点恢复。
+- 保留权限生成导航、品牌名称、所有接口及发送逻辑。
+- app.css 在 mjh-ui.css 前加载，确保新增页面获得统一视觉覆盖。
+
+部署：将本包中的 public/index.html、public/mjh-ui.css、public/mjh-ui.js
+覆盖到同一 V4 项目；其余项目文件保持原样。启动方式沿用 SETUP.md。
+无需重新配置环境变量或迁移数据库。更新后刷新页面，必要时强制刷新缓存。
+
+验证：JS 语法检查通过；必要 DOM ID 完整且唯一；受保护代码逐字节一致。
+当前环境没有可用浏览器，尚未完成真实浏览器视觉与交互验收。
+上线前请在桌面和手机检查登录、员工权限、弹窗、素材上传与公告预览；
+使用测试群验证发送及排程。本次未连接 Telegram、未发布到正式域名。
+
+## 客户品牌优先版
+- 侧栏顶部展示客户 Logo 与接口提供的品牌名称。MJH & Co 仅在侧栏左下方署名。
+- 登录页与浏览器标题以客户品牌为主。
+- 新增 public/brand-config.js：设置 name 与 logoUrl，例如 /brand-logo.png，并将图片放入 public/。
+- 不填 Logo 或图片加载失败时显示品牌首字。未提供真实 Logo，本包不含虚构客户 Logo。
+- 本次没有新增后台上传 Logo 接口；后续可由 Claude 将品牌配置接入后台设置。
+- 更新需覆盖 index.html、mjh-ui.css、mjh-ui.js，并新增 brand-config.js。

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MJH &amp; Co Member Desk</title>
+<title>品牌工作台</title>
 <style>
 :root{
   --bg:#f5f6f1; --card:#fff; --ink:#15180f; --mute:#7c8271; --line:#e6e8de;
@@ -103,27 +103,30 @@ textarea{min-height:140px;resize:vertical}
   .grid4{grid-template-columns:1fr 1fr}.two,.modal{grid-template-columns:1fr}.modal .r{border-radius:0 0 22px 22px}.bcard .g{grid-template-columns:1fr}
 }
 </style>
-<link rel="stylesheet" href="/mjh-ui.css"><link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/mjh-ui.css">
 </head>
 <body>
-<div class="initial-loading" id="initialLoading" role="status"><b>MJH DESK</b><div class="load-mark"></div><p>正在连接您的工作空间…</p></div>
+<a href="#main" class="skip-link" id="skipMain">跳到主要内容</a>
+<div class="initial-loading" id="initialLoading" role="status"><b>品牌工作台</b><div class="load-mark"></div><p>加载中…</p></div>
 <div id="login" class="login hide">
-<section class="login-visual" aria-label="MJH 品牌工作台">
-<div class="logo">MJH<small> &amp;Co.</small></div>
-<div class="login-story"><span class="eyebrow">YOUR COMMUNITY, CONNECTED.</span><h1>日常工作，井然有序。<br><span>每一步，都更简单。</span></h1><p>内容、素材与社群数据，<br>在一个清楚的工作台里完成。</p><div class="login-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 12 2 2 4-4"/><rect x="3" y="3" width="18" height="18" rx="5"/></svg><div><b>少一点繁琐，多一点从容。</b><small>清楚的数据 · 简单的操作</small></div><i></i></div></div>
-<div class="login-signature">MEMBER DESK &nbsp; / &nbsp; BY MJH &amp; CO.</div><div class="login-rings" aria-hidden="true"></div>
-</section><section class="login-content"><div class="login-caption">MJH DESK &nbsp; 品牌工作台</div>
-<form id="lf"><div class="login-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div><h2>欢迎回来</h2><p class="login-intro">输入账号和密码，<br>进入您的工作空间。</p><label for="un">账号</label><input type="text" id="un" autocomplete="username" autocapitalize="off" placeholder="输入您的账号"><label for="pw">密码</label><div class="password-wrap"><input type="password" id="pw" required autocomplete="current-password" placeholder="输入您的密码" autofocus><button type="button" id="showPassword" aria-label="显示密码" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div><div id="lerr" class="hint" style="color:var(--danger)" role="alert"></div><button class="btn" type="submit"><span>进入工作台</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button><div class="login-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>安全访问您的品牌数据</div></form>
-<div class="login-footer">忘记密码？请联系您的超级管理员重设。<span>POWERED BY MJH &amp; CO.</span></div></section></div>
+<section class="simple-login-card">
+<div class="simple-login-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="13" rx="4"/><path d="M12 3v4M8 12v3m8-3v3M9 18h6"/></svg></div>
+<h1>Telegram Bot 后台登入</h1>
+<form id="lf">
+<label for="un">账号</label><input type="text" id="un" autocomplete="username" autocapitalize="off" placeholder="输入账号" autofocus>
+<label for="pw">密码</label><div class="password-wrap"><input type="password" id="pw" required autocomplete="current-password" placeholder="输入密码"><button type="button" id="showPassword" aria-label="显示密码" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+<div id="lerr" role="alert"></div><button class="btn" type="submit">登入</button>
+</form><p class="simple-login-help">忘记密码？请联系管理员。</p>
+</section></div>
 
 <div id="app" class="app hide">
   <aside class="side">
-    <div class="logo">MJH<small> &amp;Co.</small></div><div class="sub">MEMBER DESK</div>
-    <div class="ws"><i id="wsL">D</i><div><b id="wsN">-</b><span>品牌工作空间</span></div></div>
-    <nav class="nav" id="nav"></nav>
-    <div class="foot"><span id="botst"></span><br><button id="logout">退出登入</button></div>
+    
+    <div class="ws"><span class="client-logo-slot" data-brand-logo><i id="wsL">B</i></span><div><b id="wsN">-</b><span>品牌工作空间</span></div></div>
+    <nav class="nav" id="nav" aria-label="主要导航"></nav>
+    <div class="foot"><span id="botst"></span><br><button id="logout">退出登录</button><div class="provider-credit"><span>技术支持</span><b>MJH &amp; Co.</b></div></div>
   </aside>
-  <section class="workspace"><header class="workspace-bar"><div><button class="mobile-open" id="mobileOpen" aria-label="打开导航" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><span class="breadcrumb-root">品牌工作空间</span><svg class="crumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><b id="breadcrumb">工作总览</b></div><div><span id="workspaceDate" class="workspace-date"></span><span class="timezone">MYT · UTC+8</span></div></header><main id="main"></main><footer class="workspace-footer"><span><b>MJH DESK</b><i></i>少一点繁琐，多一点从容。</span><span>您的品牌工作空间</span></footer></section><div class="workspace-shade"></div>
+  <section class="workspace"><header class="workspace-bar"><div><button class="mobile-open" id="mobileOpen" aria-label="打开导航" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><span class="breadcrumb-root">品牌工作空间</span><svg class="crumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><b id="breadcrumb">工作总览</b></div><div><span id="workspaceDate" class="workspace-date"></span><span class="timezone">MYT · UTC+8</span></div></header><main id="main" tabindex="-1"></main></section><div class="workspace-shade"></div>
 </div>
 <div id="modalRoot"></div>
 
