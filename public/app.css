@@ -70,3 +70,10 @@ body.x-ro .x-drop,body.x-ro [data-act],body.x-ro .x-modes{pointer-events:none}
 .c-grid{stroke:var(--chart-grid)}.c-txt{fill:var(--chart-txt)}.c-stop{stop-color:var(--chart)}.c-line{stroke:var(--chart)}.c-dot{fill:var(--chart-dot-bg);stroke:var(--chart)}
 .x-alert.x-note{background:var(--note-bg);border-color:var(--note-line);color:var(--note-ink)}.x-ph{color:var(--ph)}
 .two + .two{margin-top:20px}
+
+/* 弹窗右上角关闭按钮；预览里的机器人头像 */
+.modal{position:relative}
+.modal .x-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:10px;border:1px solid color-mix(in srgb,currentColor 22%,transparent);background:transparent;color:inherit;font-size:22px;line-height:1;cursor:pointer;z-index:6;opacity:.8}
+.modal .x-close:hover{opacity:1;background:color-mix(in srgb,currentColor 10%,transparent)}
+.tg .hd i{position:relative;overflow:hidden}
+.tg .hd i img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}

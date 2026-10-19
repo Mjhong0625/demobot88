@@ -64,7 +64,7 @@ function applyReadonly() {
     if (!root) return;
     root.querySelectorAll("input,select,textarea").forEach(el => { if (!el.disabled) el.disabled = true; });
     root.querySelectorAll("button,.btn,label.x-drop,.x-drop").forEach(el => {
-      if (el.closest("#nav")) return;
+      if (el.closest("#nav") || el.classList.contains("x-close")) return;
       if (RO_HIDE.test(el.textContent || "") && !/^(关闭|取消|返回)$/.test((el.textContent || "").trim())) el.style.display = "none";
     });
   });
@@ -74,6 +74,8 @@ function startReadonly() {
   const mo = new MutationObserver(() => applyReadonly());
   ["#main", "#modalRoot"].forEach(sel => { const el = $(sel); if (el) mo.observe(el, { childList: true, subtree: true }); });
 }
+
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modalRoot") && $("#modalRoot").children.length) closeModal(); });
 
 /* ---------- 登入 ---------- */
 function showLogin() { $("#app").classList.add("hide"); $("#login").classList.remove("hide"); }
@@ -112,7 +114,11 @@ function route() {
   ({ overview: pOverview, schedule: pSchedule, media: pMedia, bot: pBot, staff: pStaff, log: pLog })[p]();
 }
 const head = (t, s, extra = "") => `<div class="top"><div><h1>${t}</h1><p class="lead">${s}</p></div>${extra}</div>`;
-function openModal(html) { $("#modalRoot").innerHTML = html; const mk = $("#mk"); if (mk) mk.onclick = e => { if (e.target.id === "mk") closeModal(); }; }
+function openModal(html) {
+  $("#modalRoot").innerHTML = html;
+  const md = $("#modalRoot .modal");
+  if (md && !md.querySelector(".x-close")) { md.insertAdjacentHTML("afterbegin", '<button type="button" class="x-close" aria-label="关闭">×</button>'); md.querySelector(".x-close").onclick = closeModal; }
+  const mk = $("#mk"); if (mk) mk.onclick = e => { if (e.target.id === "mk") closeModal(); }; }
 const closeModal = () => { $("#modalRoot").innerHTML = ""; };
 async function guarded(btn, fn) { // 防止重复点击
   if (btn.disabled) return; btn.disabled = true;
@@ -253,7 +259,7 @@ function editAnn(id, dupFrom) {
     <div class="x-actions">
       ${locked ? "" : `<button class="btn" id="aGo"></button><button class="btn ghost" id="aTest">发给我自己看看</button>`}
       ${src ? `<button class="btn ghost" id="aDup">复制</button>` : ""}${id ? `<button class="btn danger" id="aDel">删除</button>` : ""}<button class="btn ghost" id="aClose" style="margin-left:auto">关闭</button></div></div>
-    <div class="r"><div style="font-size:12px;letter-spacing:.15em;color:var(--mute)">TELEGRAM 预览</div><div class="tg"><div class="hd"><i>${esc((BRAND || "D")[0])}</i><div><b id="pvT">${esc(BRAND)}</b><br><small style="color:var(--mute)">预览</small></div></div><div class="bd"><div class="bub" id="pv"></div><div class="x-pvbtns" id="pvB"></div></div></div>
+    <div class="r"><div style="font-size:12px;letter-spacing:.15em;color:var(--mute)">TELEGRAM 预览</div><div class="tg"><div class="hd"><i>${esc((BRAND || "D")[0])}<img src="/api/bot-profile/avatar" alt="" onerror="this.remove()"></i><div><b id="pvT">${esc(BRAND)}</b><br><small style="color:var(--mute)">预览</small></div></div><div class="bd"><div class="bub" id="pv"></div><div class="x-pvbtns" id="pvB"></div></div></div>
     <p class="hint">预览为示意，实际显示以 Telegram 为准。</p></div></div></div>`;
 
   openModal(body());
