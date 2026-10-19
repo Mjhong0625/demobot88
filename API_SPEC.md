@@ -119,3 +119,13 @@ Button = { "id":"", "label":"按钮文字", "type":"builtin|text|link", "enabled
 
 ## 分工与参考实现
 前端分工见 `README-UI.md`。`public/app.js` 是 Claude 维护的交互逻辑，包含所有接口调用的写法。
+
+## V6 新增：帖子按钮、点击数据、发布后管理、群人数
+- 公告新增 `buttons:[{label,url}]`（最多 3 个，url 必须 https://），`POST /api/announcements` 和 `POST /api/announcements/:id/edit` 都带这个字段。
+- 点击追踪：bot 发出的按钮链接是 `PUBLIC_URL/r/<公告id>/<按钮序号>`，公开路由 `GET /r/:aid/:idx` 记一笔再 302 到真实链接。没有设置 `PUBLIC_URL`（或 Railway 域名）时退回直接链接，不能统计，`/api/me` 的 `trackingReady=false`，前端要提示。
+- `GET /api/announcements/:id/stats` → `{clicks, unique, members, ctr, buttons:[{label,url,clicks,unique}], hourly:[24], tracked, sentAt, pinned, removedAt, manageable}`。`unique` 按 IP+设备指纹去重，是估算值。列表接口的每则已发送公告多一个 `stats`。
+- 发布后管理（已发送的公告）：`POST /:id/edit {text,buttons}`（只能改正文和按钮，素材不能换）、`POST /:id/pin {pin:true|false}`、`POST /:id/delete-message`（从 Telegram 删除，后台数据保留，`removedAt` 有值）。失败回 400 中文原因（例如 bot 没有管理权限）。
+- `GET /api/members[?refresh=1]` → `{list:[{id,name,count,delta7,series:[{d,n}]}]}`，群/频道总人数快照，每 6 小时和每次发帖时记录。Telegram 不提供在线或活跃人数。
+- `GET /api/insights` → `{bestTimes:{enough,slots:[{hour,label,posts,avgUnique}],needMore}, trackingReady}`，按发帖整点统计平均点击人数，至少 5 则带按钮的帖子且点击满 20 人才给建议。
+- 每周报告（默认关闭）：`GET/PUT /api/weekly-report`（`{enabled,weekday(0=周日),hour}`）、`POST /preview`、`POST /test`。到点由 bot 私信 `ADMIN_IDS` 和 `STORAGE_CHAT_ID`。
+- 发送失败时 bot 也会私信同一批管理员。

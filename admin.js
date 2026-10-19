@@ -3,6 +3,7 @@ const express = require("express");
 const multer = require("multer");
 const crypto = require("crypto");
 const path = require("path");
+const insights = require("./insights");
 
 const DAY = 86400000;
 const TTL_DAYS = Math.max(1, Number(process.env.MEDIA_TTL_DAYS) || 30);
@@ -15,8 +16,9 @@ const PERMS = {
 };
 const ROLE_LABEL = { super_admin: "超级管理员", admin: "管理员", guest: "访客（只读）" };
 
-function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BOT_TOKEN }) {
+function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BOT_TOKEN, ops, publicBase, snapshotMembers, notifyAdmins }) {
   const app = express();
+  app.set("trust proxy", true); // 在 Railway 等代理后面才能拿到访客真实 IP
   const D = () => store.data;
 
   // ---------------- 账号与密码 ----------------
@@ -77,7 +79,7 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
   app.use(express.json({ limit: "1mb" }));
 
   // 访客只读：除登入/登出和「测试连接」外，所有写入类请求一律拒绝
-  const GUEST_OK = new Set(["/api/login", "/api/logout", "/api/targets/check"]);
+  const GUEST_OK = new Set(["/api/login", "/api/logout", "/api/targets/check", "/api/weekly-report/preview"]);
   app.use("/api", (req, res, next) => {
     if (req.method === "GET" || req.method === "HEAD") return next();
     if (GUEST_OK.has(req.originalUrl.split("?")[0])) return next();
@@ -86,6 +88,29 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
     next();
   });
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+  // 帖子按钮的点击追踪：Telegram 里的按钮先到这里记一笔，再跳到真正的链接（公开路由，不需要登入）
+  const BOT_UA = /bot|crawl|spider|preview|facebookexternalhit|slurp|curl|wget|python|node-fetch|headless|monitor/i;
+  const lastClick = new Map();
+  app.get("/r/:aid/:idx", (req, res) => {
+    const a = D().announcements.find((x) => x.id === req.params.aid);
+    const btn = a && (a.buttons || [])[Number(req.params.idx)];
+    if (!btn || !btn.url) return res.status(404).type("text").send("这个链接已失效");
+    const ua = String(req.headers["user-agent"] || "");
+    if (!BOT_UA.test(ua)) {
+      const ip = String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim();
+      const h = crypto.createHash("sha1").update(ip + "|" + ua + "|mjh").digest("hex").slice(0, 10);
+      const key = `${a.id}|${req.params.idx}|${h}`;
+      if (Date.now() - (lastClick.get(key) || 0) > 3000) { // 3 秒内重复点击只算一次
+        lastClick.set(key, Date.now());
+        D().clicks.push({ t: Date.now(), a: a.id, b: Number(req.params.idx), h });
+        if (D().clicks.length > 60000) D().clicks.splice(0, D().clicks.length - 60000);
+        store.save();
+      }
+      if (lastClick.size > 5000) lastClick.clear();
+    }
+    res.set("Cache-Control", "no-store").redirect(302, btn.url);
+  });
 
   app.get("/health", (req, res) => res.type("text").send(`ok | bot: ${isReady() ? "connected" : "connecting"}`));
 
@@ -124,6 +149,7 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
       user: u ? publicUser(u) : null,
       can: u ? { bot: can(u, "bot"), users: can(u, "users"), log: can(u, "log"), targetsEdit: can(u, "targets_edit") } : null,
       readonly: !!u && u.role === "guest",
+      trackingReady: !!publicBase(),
       mediaTtlDays: TTL_DAYS,
     });
   });
@@ -353,8 +379,10 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
       const m = await bot.telegram.getChatMember(chat.id, me.id);
       const isAdmin = m.status === "administrator" || m.status === "creator";
       const canPost = chat.type === "channel" ? isAdmin && m.can_post_messages !== false : ["administrator", "creator", "member"].includes(m.status) && m.can_send_messages !== false;
+      let members = null;
+      try { members = await ops.memberCount(chat.id); } catch (e) { /* 读不到人数 */ }
       res.json({
-        ok: true, title: chat.title || chat.username || String(chat.id), type: chat.type, canPost,
+        ok: true, title: chat.title || chat.username || String(chat.id), type: chat.type, canPost, members,
         message: canPost ? "连接成功，bot 可以发布" : chat.type === "channel" ? "bot 在这个频道里还不是管理员，请先把 bot 设为管理员并开启「发布消息」" : "bot 在这个群里暂时不能发言，请检查权限",
       });
     } catch (e) {
@@ -369,7 +397,7 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
   };
   app.get("/api/announcements", guard, (req, res) => {
     res.json({
-      list: D().announcements.slice().sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)).map((a) => ({ ...a, targetName: targetName(a), mediaMissing: !!a.mediaId && !D().media.some((m) => m.id === a.mediaId) })),
+      list: D().announcements.slice().sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)).map((a) => ({ ...a, targetName: targetName(a), mediaMissing: !!a.mediaId && !D().media.some((m) => m.id === a.mediaId), stats: a.status === "sent" && (a.buttons || []).length ? (({ clicks, unique, ctr, tracked }) => ({ clicks, unique, ctr, tracked }))(insights.postStats(D(), a)) : null })),
       defaultTarget: process.env.DEFAULT_TARGET || "",
     });
   });
@@ -387,6 +415,14 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
     let targetId = String(b.targetId || "");
     if (targetId && !targetList().some((t) => t.id === targetId)) return res.status(400).json({ error: "选择的发布位置已不存在，请重新选择" });
     const legacyTarget = String(b.target || "").trim();
+    const buttons = [];
+    for (const x of (Array.isArray(b.buttons) ? b.buttons : []).slice(0, 3)) {
+      const label = String((x && x.label) || "").trim().slice(0, 30), url = String((x && x.url) || "").trim();
+      if (!label && !url) continue;
+      if (!label || !url) return res.status(400).json({ error: "每个按钮都要填名称和链接" });
+      if (!/^https:\/\/[^\s]+\.[^\s]+$/i.test(url)) return res.status(400).json({ error: `按钮「${label}」的链接要以 https:// 开头` });
+      buttons.push({ label, url });
+    }
     if (status === "scheduled") {
       if (!targetId && !legacyTarget && !process.env.DEFAULT_TARGET) return res.status(400).json({ error: "请先选择发布位置" });
       if (!at) return res.status(400).json({ error: "请先选择发布时间" });
@@ -402,7 +438,7 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
       title: String(b.title || "").trim().slice(0, 80) || text.trim().split("\n")[0].slice(0, 20),
       targetId, target: targetId ? "" : legacyTarget,
       text: text.slice(0, 4000),
-      mediaId: b.mediaId || "",
+      mediaId: b.mediaId || "", buttons,
       at: at ? at.toISOString() : null,
       status, error: "", updatedBy: actor(req), updatedAt: new Date().toISOString(),
     });
@@ -427,11 +463,84 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
     const target = process.env.STORAGE_CHAT_ID;
     if (!target) return res.status(400).json({ error: "还没有设置测试接收位置（STORAGE_CHAT_ID），请联系技术支持" });
     try {
-      await sendAnnouncement({ text: req.body.text, mediaId: req.body.mediaId }, target);
+      await sendAnnouncement({ text: req.body.text, mediaId: req.body.mediaId, buttons: req.body.buttons }, target);
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ error: "发送失败：" + e.message });
     }
+  });
+
+  // ---------------- 每帖数据 + 发布后管理 ----------------
+  const sentPost = (req, res) => {
+    const a = D().announcements.find((x) => x.id === req.params.id);
+    if (!a || a.status !== "sent") { res.status(404).json({ error: "找不到这则已发送的公告" }); return null; }
+    if (!a.sent) { res.status(400).json({ error: "这则公告是旧版本发送的，没有留下消息编号，无法在后台管理" }); return null; }
+    return a;
+  };
+  app.get("/api/announcements/:id/stats", guard, (req, res) => {
+    const a = D().announcements.find((x) => x.id === req.params.id);
+    if (!a) return res.status(404).json({ error: "找不到这则公告" });
+    res.json({ ...insights.postStats(D(), a), sentAt: a.sentAt || null, pinned: !!a.pinned, removedAt: a.removedAt || null, manageable: !!a.sent && !a.removedAt });
+  });
+  app.post("/api/announcements/:id/edit", guard, async (req, res) => {
+    const a = sentPost(req, res); if (!a) return;
+    if (a.removedAt) return res.status(400).json({ error: "这则帖子已经从频道删除" });
+    const text = String(req.body.text ?? a.text ?? "").slice(0, 4000);
+    if (!text.trim() && !a.mediaId) return res.status(400).json({ error: "正文不能为空" });
+    const buttons = [];
+    for (const x of (Array.isArray(req.body.buttons) ? req.body.buttons : (a.buttons || [])).slice(0, 3)) {
+      const label = String((x && x.label) || "").trim().slice(0, 30), url = String((x && x.url) || "").trim();
+      if (!label && !url) continue;
+      if (!label || !url) return res.status(400).json({ error: "每个按钮都要填名称和链接" });
+      if (!/^https:\/\/[^\s]+\.[^\s]+$/i.test(url)) return res.status(400).json({ error: `按钮「${label}」的链接要以 https:// 开头` });
+      buttons.push({ label, url });
+    }
+    try { await ops.edit(a, { text, buttons }); } catch (e) { return res.status(400).json({ error: "修改失败：" + e.message }); }
+    a.text = text; a.buttons = buttons; a.editedAt = new Date().toISOString();
+    store.logAction("修改已发布的帖子", a.title || a.id, actor(req));
+    store.save();
+    res.json({ ok: true });
+  });
+  app.post("/api/announcements/:id/pin", guard, async (req, res) => {
+    const a = sentPost(req, res); if (!a) return;
+    const on = req.body.pin !== false;
+    try { await ops.pin(a, on); } catch (e) { return res.status(400).json({ error: (on ? "置顶" : "取消置顶") + "失败：" + e.message }); }
+    a.pinned = on;
+    store.logAction(on ? "置顶帖子" : "取消置顶", a.title || a.id, actor(req));
+    store.save();
+    res.json({ ok: true, pinned: on });
+  });
+  app.post("/api/announcements/:id/delete-message", guard, async (req, res) => {
+    const a = sentPost(req, res); if (!a) return;
+    try { await ops.remove(a); } catch (e) { return res.status(400).json({ error: "删除失败：" + e.message }); }
+    a.removedAt = new Date().toISOString(); a.pinned = false;
+    store.logAction("从频道删除帖子", a.title || a.id, actor(req));
+    store.save();
+    res.json({ ok: true });
+  });
+
+  // 群人数、最佳发布时间
+  app.get("/api/members", guard, async (req, res) => {
+    if (req.query.refresh === "1") { try { await snapshotMembers(); } catch (e) { /* 略过 */ } }
+    const list = insights.memberSummary(D(), targetList());
+    res.json({ list });
+  });
+  app.get("/api/insights", guard, (req, res) => res.json({ bestTimes: insights.bestTimes(D()), trackingReady: !!publicBase() }));
+
+  // 每周报告（框架，默认关闭）
+  app.get("/api/weekly-report", need("bot"), (req, res) => res.json({ ...D().weekly, recipients: !!(process.env.ADMIN_IDS || process.env.STORAGE_CHAT_ID) }));
+  app.put("/api/weekly-report", need("bot"), (req, res) => {
+    const w = req.body || {};
+    D().weekly = { ...D().weekly, enabled: !!w.enabled, weekday: Math.min(6, Math.max(0, Number(w.weekday) || 0)), hour: Math.min(23, Math.max(0, Number(w.hour) || 0)) };
+    store.logAction(D().weekly.enabled ? "开启每周报告" : "关闭每周报告", "", actor(req));
+    store.save();
+    res.json({ ok: true });
+  });
+  app.post("/api/weekly-report/preview", need("bot"), (req, res) => res.json({ text: insights.buildWeeklyReport(D(), D().targets) }));
+  app.post("/api/weekly-report/test", need("bot"), async (req, res) => {
+    if (!process.env.STORAGE_CHAT_ID && !process.env.ADMIN_IDS) return res.status(400).json({ error: "还没有设置接收位置（STORAGE_CHAT_ID 或 ADMIN_IDS），请联系技术支持" });
+    await notifyAdmins(insights.buildWeeklyReport(D(), D().targets));
+    res.json({ ok: true });
   });
 
   // ---------------- 素材库 ----------------

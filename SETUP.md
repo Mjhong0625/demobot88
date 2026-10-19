@@ -69,3 +69,8 @@
 - 图片上限 10MB，视频上限 50MB（Telegram Bot API 限制）
 - 邀请链接会真实归因：好友通过 `?start=ref_xxx` 首次进入即算一笔，推荐人收到通知
 - 本 demo 不接真实平台 API，不做风控异常标记
+
+
+## 帖子按钮点击追踪（V6）
+在 Railway Variables 加 `PUBLIC_URL`，值是后台的公开网址（现在是 Railway 的 https 网址，之后换成自己的域名，例如 https://desk.mjhco.com）。没设置时，如果 Railway 已生成域名，系统会自动使用；两者都没有时按钮仍可用，但无法统计点击。
+新增数据（点击记录、群人数快照）存在 DATA_DIR，正式客户记得挂 Volume。

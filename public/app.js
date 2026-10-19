@@ -11,6 +11,7 @@ const ICON = {
 };
 const ALL_PAGES = [["overview", "工作总览", "overview"], ["schedule", "发文排程", "schedule"], ["media", "素材库", "media"], ["bot", "机器人设置", "bot"], ["staff", "员工与权限", "staff"], ["log", "操作记录", "log"]];
 const BUILTIN = { activity_menu: "限时活动", bind_id: "领取Giftcode", checkin: "每日签到", my_points: "我的积分", lucky_draw: "幸运抽奖", referral: "邀请好友", faq_menu: "常见问题", internal_menu: "内部功能展示" };
+const WD = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const STATUS = { draft: "草稿", scheduled: "待发送", sent: "已发送", failed: "发送失败" };
 const ROLE_DESC = { super_admin: "可以管理员工账号、机器人设置、发布位置，以及发文和素材", admin: "负责日常发文和素材，不能改机器人设置和员工账号", guest: "只能查看所有页面内容，不能修改任何东西，适合给潜在客户或同事浏览" };
 
@@ -55,7 +56,7 @@ function tomorrowAt(h, mi) { // 明天某时某分（马来西亚时间）
 }
 
 /* ---------- 访客只读：禁用输入、隐藏会修改数据的按钮（服务器端同样会拒绝写入） ---------- */
-const RO_HIDE = /^[＋+]|保存|发送|排程|新建|新增|添加|删除|移除|上传|延长|复制|重设|更换|确认|测试|发给我|选择文件|从素材库选择|立即|草稿/;
+const RO_HIDE = /^[＋+×]|编辑内容|置顶|刷新人数|保存|发送|排程|新建|新增|添加|删除|移除|上传|延长|复制|重设|更换|确认|测试|发给我|选择文件|从素材库选择|立即|草稿/;
 function applyReadonly() {
   if (!ME || !ME.readonly) return;
   const main = $("#main"), mod = $("#modalRoot");
@@ -131,7 +132,7 @@ function changePassword() {
 let ovDays = 7, ovTab = "newUsers";
 async function pOverview() {
   const main = $("#main");
-  const d = await api("overview?days=" + ovDays);
+  const [d, mem, ins] = await Promise.all([api("overview?days=" + ovDays), api("members").catch(() => ({ list: [] })), api("insights").catch(() => null)]);
   $("#botst").textContent = d.attention.botReady ? "● Bot 已连线" : "○ Bot 连线中";
   const c = d.cards, a = d.attention, isSuper = ME.can.bot;
   const att = [];
@@ -157,10 +158,23 @@ async function pOverview() {
         <div id="chart"></div></div>
       <div class="card"><h3 style="margin:0 0 8px">需要您关注 <span class="chip draft">${att.length}</span></h3>
         ${att.length ? att.map(x => `<div class="item"><div class="ic">${esc(x[0])}</div><div><b>${esc(x[1])}</b><small>${esc(x[2])}</small></div></div>`).join("") : '<div class="empty">目前没有待办事项</div>'}</div>
+    </div>
+    <div class="two">
+      <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">群人数</h3><a href="javascript:void(0)" id="memRf" style="font-size:13px;color:var(--mute)">刷新人数</a></div>
+        ${mem.list.length ? mem.list.map(m => `<div class="item"><div><b>${esc(m.name)}</b><small>${m.count == null ? "还没有读取到人数，bot 需要在该群/频道里" : (m.delta7 == null ? "累积数据中" : "近 7 天 " + (m.delta7 >= 0 ? "+" : "") + m.delta7)}</small></div><div class="x-mn">${m.count == null ? "-" : m.count.toLocaleString("en-US")}</div></div>`).join("") : '<div class="empty">设置发布位置后，这里会显示每个群或频道的人数</div>'}
+        <p class="hint" style="margin-bottom:0">Telegram 只提供总人数，不提供在线或活跃人数。活跃情况请看上方「Bot 互动人数」。</p></div>
+      <div class="card"><h3 style="margin:0 0 8px">最佳发布时间</h3>${bestHtml(ins)}</div>
     </div>`;
+  $("#memRf").onclick = async () => { toast("正在读取最新人数…"); try { await api("members?refresh=1"); } catch (e) {} pOverview(); };
   $("#rng").onclick = e => { const b = e.target.closest("button"); if (b) { ovDays = +b.dataset.d; pOverview(); } };
   $("#ctabs").onclick = e => { const b = e.target.closest("a"); if (b) { ovTab = b.dataset.t; drawChart(d); document.querySelectorAll("#ctabs a").forEach(x => x.classList.toggle("on", x === b)); } };
   drawChart(d);
+}
+function bestHtml(ins) {
+  if (!ins) return '<div class="empty">暂时读取不到</div>';
+  const b = ins.bestTimes;
+  if (b.enough) return b.slots.map((x, i) => `<div class="item"><div class="ic">${i + 1}</div><div><b>${x.label}</b><small>这个时段发布的 ${x.posts} 则帖子，平均每则约 ${x.avgUnique} 人点击</small></div></div>`).join("") + '<p class="hint" style="margin-bottom:0">根据已发布帖子的按钮点击推算，发得越多越准。</p>';
+  return `<div class="empty">数据累积中。${ins.trackingReady ? `发布带按钮的帖子后开始统计${b.needMore ? `，再发 ${b.needMore} 则就能看到建议` : ""}。` : "需要先设置公开网址才能统计按钮点击，请联系技术支持。"}</div>`;
 }
 function drawChart(d) {
   const v = d.series[ovTab], W = 720, H = 260, P = { l: 36, r: 16, t: 14, b: 30 };
@@ -195,16 +209,17 @@ function renderSchedule() {
   const tabs = [["all", "全部"], ["scheduled", "待发送"], ["draft", "草稿"], ["sent", "已发送"], ["failed", "发送失败"]];
   $("#main").innerHTML = head("发文排程", "写好内容、加上图片或视频，选择立即发送或定时发送。", `<button class="btn" onclick="editAnn()">＋ 新建公告</button>`) +
     `<div class="card"><div class="tabs" id="atabs">${tabs.map(([k, n]) => `<a data-f="${k}" class="${f === k ? "on" : ""}">${n}${cnt(k) ? ` <span class="x-n">${cnt(k)}</span>` : ""}</a>`).join("")}</div>` +
-    (shown.length ? `<table><tr><th>内容</th><th>发布位置</th><th>计划时间（马来西亚）</th><th>素材</th><th>状态</th><th>编辑者</th></tr>${shown.map(a => `<tr class="click" onclick="editAnn('${a.id}')"><td><b>${esc(a.title || "（未命名）")}</b><br><small style="color:var(--mute)">${esc((a.text || "").replace(/\n/g, " ").slice(0, 36))}</small></td><td>${esc(a.targetName || "未选择")}</td><td>${fmtDT(a.at)}</td><td>${a.mediaId ? (a.mediaMissing ? '<span style="color:var(--danger)">素材已过期</span>' : esc((MEDIA.find(x => x.id === a.mediaId) || {}).name || "有素材")) : "纯文字"}</td><td><span class="chip ${a.status}">${STATUS[a.status]}</span>${a.error ? `<br><small style="color:var(--danger)">${esc(a.error)}</small>` : ""}</td><td>${esc(a.updatedBy || a.createdBy || "")}</td></tr>`).join("")}</table>` : `<div class="empty">${f === "all" ? "还没有公告，点右上角新建第一则" : "这个分类下还没有公告"}</div>`) + `</div>`;
+    (shown.length ? `<table><tr><th>内容</th><th>发布位置</th><th>计划时间（马来西亚）</th><th>素材</th><th>状态</th><th>点击</th><th>编辑者</th></tr>${shown.map(a => `<tr class="click" onclick="${a.status === "sent" ? "postDetail" : "editAnn"}('${a.id}')"><td><b>${esc(a.title || "（未命名）")}</b><br><small style="color:var(--mute)">${esc((a.text || "").replace(/\n/g, " ").slice(0, 36))}</small></td><td>${esc(a.targetName || "未选择")}</td><td>${fmtDT(a.at)}</td><td>${a.mediaId ? (a.mediaMissing ? '<span style="color:var(--danger)">素材已过期</span>' : esc((MEDIA.find(x => x.id === a.mediaId) || {}).name || "有素材")) : "纯文字"}</td><td><span class="chip ${a.status}">${STATUS[a.status]}</span>${a.removedAt ? ' <span class="chip failed">已从频道删除</span>' : ""}${a.pinned ? ' <span class="chip draft">置顶</span>' : ""}${a.error ? `<br><small style="color:var(--danger)">${esc(a.error)}</small>` : ""}</td><td>${a.stats ? (a.stats.tracked ? `<b>${a.stats.unique}</b> 人 <small style="color:var(--mute)">/ ${a.stats.clicks} 次</small>` : '<small style="color:var(--mute)">未追踪</small>') : '<small style="color:var(--mute)">-</small>'}</td><td>${esc(a.updatedBy || a.createdBy || "")}</td></tr>`).join("")}</table>` : `<div class="empty">${f === "all" ? "还没有公告，点右上角新建第一则" : "这个分类下还没有公告"}</div>`) + `</div>`;
   $("#atabs").onclick = e => { const a = e.target.closest("a"); if (a) { annFilter = a.dataset.f; renderSchedule(); } };
 }
 
 function editAnn(id, dupFrom) {
   const src = (window.ANN || []).find(x => x.id === (id || dupFrom));
   const E = {
-    id: id || undefined, title: "", targetId: "", text: "", mediaId: "", mode: "schedule", at: wall(60), status: "draft", error: "", uploading: false,
+    id: id || undefined, title: "", targetId: "", text: "", mediaId: "", mode: "schedule", at: wall(60), status: "draft", error: "", uploading: false, buttons: [],
   };
   if (src) {
+    E.buttons = (src.buttons || []).map(b => ({ ...b }));
     Object.assign(E, { title: dupFrom ? "" : src.title, targetId: src.targetId || "", text: src.text || "", mediaId: src.mediaMissing ? "" : (src.mediaId || ""), status: src.status, error: src.error || "" });
     if (!dupFrom) { E.mode = src.status === "draft" ? "draft" : "schedule"; if (src.at) E.at = toLocalInput(src.at); }
   }
@@ -224,6 +239,8 @@ function editAnn(id, dupFrom) {
     <label>正文</label><textarea id="aX" ${locked ? "disabled" : ""} placeholder="写下想告诉会员的内容…">${esc(E.text)}</textarea>
     <div class="hint" id="aCnt"></div>
     <label>图片或视频（选填）</label><div id="mArea"></div>
+    <label>按钮（选填，最多 3 个）</label><div id="bArea"></div>
+    ${ME.trackingReady ? '<div class="hint">按钮的点击会自动统计，发出后在「发文排程」点这则帖子就能看到数据。</div>' : '<div class="x-alert">还没有设置公开网址，按钮可以用，但点击无法统计。请联系技术支持设置。</div>'}
     ${locked ? "" : `<label>怎么发送</label>
     <div class="x-modes" id="aModes">
       <button type="button" data-m="now" class="x-mode"><b>立即发送</b><small>马上发出</small></button>
@@ -236,7 +253,7 @@ function editAnn(id, dupFrom) {
     <div class="x-actions">
       ${locked ? "" : `<button class="btn" id="aGo"></button><button class="btn ghost" id="aTest">发给我自己看看</button>`}
       ${src ? `<button class="btn ghost" id="aDup">复制</button>` : ""}${id ? `<button class="btn danger" id="aDel">删除</button>` : ""}<button class="btn ghost" id="aClose" style="margin-left:auto">关闭</button></div></div>
-    <div class="r"><div style="font-size:12px;letter-spacing:.15em;color:var(--mute)">TELEGRAM 预览</div><div class="tg"><div class="hd"><i>${esc((BRAND || "D")[0])}</i><div><b id="pvT">${esc(BRAND)}</b><br><small style="color:var(--mute)">预览</small></div></div><div class="bd"><div class="bub" id="pv"></div></div></div>
+    <div class="r"><div style="font-size:12px;letter-spacing:.15em;color:var(--mute)">TELEGRAM 预览</div><div class="tg"><div class="hd"><i>${esc((BRAND || "D")[0])}</i><div><b id="pvT">${esc(BRAND)}</b><br><small style="color:var(--mute)">预览</small></div></div><div class="bd"><div class="bub" id="pv"></div><div class="x-pvbtns" id="pvB"></div></div></div>
     <p class="hint">预览为示意，实际显示以 Telegram 为准。</p></div></div></div>`;
 
   openModal(body());
@@ -249,6 +266,7 @@ function editAnn(id, dupFrom) {
     const g = $("#aG"); const tn = g && g.selectedOptions[0] && g.value ? g.selectedOptions[0].textContent : BRAND;
     $("#pvT").textContent = tn;
     $("#pv").innerHTML = (m ? (m.type === "photo" ? `<img src="/api/media/${m.id}/file">` : `<div class="vid">视频：${esc(m.name)}</div>`) : "") + (t ? esc(t) : '<span style="color:#9aa">您的公告内容会出现在这里。</span>') + `<div class="tm">${(E.mode === "schedule" ? ($("#aA") ? $("#aA").value : E.at) : toLocalInput(new Date().toISOString())).slice(-5)} ✓✓</div>`;
+    $("#pvB").innerHTML = E.buttons.filter(b => b.label).map(b => `<div>${esc(b.label)}</div>`).join("");
     const n = t.length;
     $("#aCnt").textContent = m && n > 1024 ? `正文 ${n} 字：带图片/视频时超过 1024 字会拆成两条消息发出` : `${n} 字`;
   };
@@ -290,7 +308,7 @@ function editAnn(id, dupFrom) {
     $("#aGo").textContent = GO[E.mode];
     pv();
   };
-  drawMedia(); pv();
+  drawMedia(); btnRows($("#bArea"), E.buttons, pv, locked); pv();
   ["aX"].forEach(k => $("#" + k).addEventListener("input", pv));
   const g = $("#aG"); if (g) g.addEventListener("change", () => { E.targetId = g.value; if (g.value) E.legacyTarget = ""; pv(); });
   if (locked) {
@@ -310,15 +328,74 @@ function editAnn(id, dupFrom) {
       if (!text.trim() && !E.mediaId) throw new Error("请填写正文，或添加一张图片/视频");
       const tn = $("#aG") && $("#aG").selectedOptions[0] ? $("#aG").selectedOptions[0].textContent : "";
       if (E.mode === "now" && !confirm(`确定现在就发送到「${tn || "所选位置"}」吗？发送后无法撤回。`)) return;
-      const payload = { id: E.id, title: $("#aT") ? $("#aT").value : "", targetId, target: E.legacyTarget || "", text, mediaId: E.mediaId, status: E.mode === "draft" ? "draft" : "scheduled", at: E.mode === "schedule" ? fromLocalInput($("#aA").value) : null, sendNow: E.mode === "now" };
+      const payload = { id: E.id, title: $("#aT") ? $("#aT").value : "", targetId, target: E.legacyTarget || "", text, mediaId: E.mediaId, buttons: E.buttons, status: E.mode === "draft" ? "draft" : "scheduled", at: E.mode === "schedule" ? fromLocalInput($("#aA").value) : null, sendNow: E.mode === "now" };
       await api("announcements", { method: "POST", body: payload });
       toast(E.mode === "now" ? "已提交，正在发送…" : E.mode === "schedule" ? "已确认，到时间会自动发送" : "草稿已保存");
       close(); pSchedule();
     });
-    $("#aTest").onclick = e => guarded(e.target.closest("button"), async () => { await api("announcements/test", { method: "POST", body: { text: $("#aX").value, mediaId: E.mediaId } }); toast("已发到你自己的 Telegram，去看看效果"); });
+    $("#aTest").onclick = e => guarded(e.target.closest("button"), async () => { await api("announcements/test", { method: "POST", body: { text: $("#aX").value, mediaId: E.mediaId, buttons: E.buttons.filter(b => b.label && b.url) } }); toast("已发到你自己的 Telegram，去看看效果"); });
   }
   if (src && $("#aDup") && !locked) $("#aDup").onclick = () => editAnn(null, src.id);
   if (id) $("#aDel").onclick = e => guarded(e.target.closest("button"), async () => { if (!confirm("确定删除这则公告？")) return; await api("announcements/" + id, { method: "DELETE" }); close(); pSchedule(); });
+}
+
+/* 按钮编辑行（发文窗口和已发帖子的修改共用） */
+function btnRows(el, arr, onChange, readonly) {
+  const draw = () => {
+    el.innerHTML = arr.map((b, i) => `<div class="x-brow"><input type="text" class="bL" data-i="${i}" placeholder="按钮名称，例如：立即领取" maxlength="30" value="${esc(b.label)}" ${readonly ? "disabled" : ""}><input type="url" class="bU" data-i="${i}" placeholder="https://链接" value="${esc(b.url)}" ${readonly ? "disabled" : ""}>${readonly ? "" : `<button type="button" class="x-rm" data-i="${i}" aria-label="删除按钮">×</button>`}</div>`).join("") +
+      (!readonly && arr.length < 3 ? `<button type="button" class="btn ghost sm" data-add="1">＋ 添加按钮</button>` : "");
+  };
+  el.oninput = e => { const i = e.target.dataset.i; if (i == null) return; arr[i][e.target.classList.contains("bL") ? "label" : "url"] = e.target.value; onChange && onChange(); };
+  el.onclick = e => {
+    const rm = e.target.closest(".x-rm"), add = e.target.closest("[data-add]");
+    if (rm) { arr.splice(+rm.dataset.i, 1); draw(); onChange && onChange(); }
+    else if (add) { arr.push({ label: "", url: "" }); draw(); }
+  };
+  draw();
+}
+
+/* ---------- 已发帖子：数据 + 发布后管理 ---------- */
+async function postDetail(id) {
+  let st;
+  try { st = await api("announcements/" + id + "/stats"); } catch (e) { return toast(e.message, 1); }
+  const a = (window.ANN || []).find(x => x.id === id); if (!a) return;
+  const hasBtn = (a.buttons || []).length > 0;
+  const max = Math.max(1, ...st.hourly);
+  const draw = () => {
+    openModal(`<div class="mask" id="mk"><div class="modal x-narrow x-stats"><div class="l">
+      <h3>${esc(a.title || "帖子数据")}</h3>
+      <p class="hint" style="margin:0 0 14px">${esc(a.targetName || "")} · 发出于 ${fmtDT(st.sentAt)}（马来西亚时间）${a.pinned ? " · 已置顶" : ""}</p>
+      ${st.removedAt ? '<div class="x-alert">这则帖子已经从频道删除，数据仍然保留。</div>' : ""}
+      ${hasBtn && !st.tracked ? '<div class="x-alert">这则帖子发出时还没有设置公开网址，按钮没有追踪点击。</div>' : ""}
+      ${!hasBtn ? '<div class="x-alert" style="background:#f4f4f0;border-color:#e3e3dc;color:#555">这则帖子没有按钮，所以没有点击数据。下次发文加上按钮，就能看到转化。</div>' : `
+      <div class="x-sg"><div class="x-sc"><small>点击次数</small><b>${st.clicks}</b></div><div class="x-sc"><small>点击人数（约）</small><b>${st.unique}</b></div><div class="x-sc"><small>点击率</small><b>${st.ctr == null ? "-" : st.ctr + "%"}</b></div><div class="x-sc"><small>发出时群人数</small><b>${st.members ? st.members.toLocaleString("en-US") : "-"}</b></div></div>
+      <table class="x-bt"><tr><th>按钮</th><th>点击次数</th><th>点击人数</th></tr>${st.buttons.map(b => `<tr><td>${esc(b.label)}<br><small style="color:var(--mute)">${esc(b.url)}</small></td><td>${b.clicks}</td><td>${b.unique}</td></tr>`).join("")}</table>
+      <label>发出后 24 小时的点击分布</label>
+      <div class="x-bars">${st.hourly.map((n, i) => `<i title="发出后第 ${i + 1} 小时：${n} 次" style="height:${Math.max(3, n / max * 100)}%"></i>`).join("")}</div>
+      <div class="x-bl"><span>0 小时</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+      <p class="hint">点击人数按访客的网络和设备去重，是接近的估算值，不是精确人数。点击率 = 点击人数 ÷ 发出时群人数。</p>`}
+      <div id="pdMg" class="x-actions">
+        ${st.manageable ? `<button class="btn ghost" id="pdEd">编辑内容</button><button class="btn ghost" id="pdPin">${st.pinned ? "取消置顶" : "置顶"}</button><button class="btn danger" id="pdRm">从频道删除</button>` : ""}
+        <button class="btn ghost" id="pdDup">复制</button><button class="btn ghost" id="pdX" style="margin-left:auto">关闭</button></div>
+      <div id="pdEdit"></div>
+    </div></div></div>`);
+    $("#pdX").onclick = closeModal;
+    $("#pdDup").onclick = () => editAnn(null, id);
+    if (!st.manageable) return;
+    $("#pdPin").onclick = e => guarded(e.target.closest("button"), async () => { const r = await api("announcements/" + id + "/pin", { method: "POST", body: { pin: !st.pinned } }); a.pinned = r.pinned; st.pinned = r.pinned; toast(r.pinned ? "已置顶" : "已取消置顶"); draw(); });
+    $("#pdRm").onclick = e => guarded(e.target.closest("button"), async () => { if (!confirm("确定把这则帖子从 Telegram 频道/群里删除吗？删除后无法恢复，后台的数据会保留。")) return; await api("announcements/" + id + "/delete-message", { method: "POST" }); toast("已从频道删除"); closeModal(); pSchedule(); });
+    $("#pdEd").onclick = () => {
+      const btns = (a.buttons || []).map(b => ({ ...b }));
+      $("#pdMg").classList.add("hide");
+      $("#pdEdit").innerHTML = `<h3 style="margin:18px 0 6px">修改已发出的帖子</h3><p class="hint" style="margin-top:0">改完会同步更新 Telegram 里的这则帖子。图片或视频不能更换，需要换的话请删除后重发。</p>
+        <label>正文</label><textarea id="pdT">${esc(a.text || "")}</textarea><label>按钮</label><div id="pdB"></div>
+        <div class="x-actions"><button class="btn" id="pdSv">保存并同步到 Telegram</button><button class="btn ghost" id="pdNo">取消</button></div>`;
+      btnRows($("#pdB"), btns);
+      $("#pdNo").onclick = draw;
+      $("#pdSv").onclick = e => guarded(e.target.closest("button"), async () => { await api("announcements/" + id + "/edit", { method: "POST", body: { text: $("#pdT").value, buttons: btns } }); toast("已更新"); closeModal(); pSchedule(); });
+    };
+  };
+  draw();
 }
 
 /* ---------- 素材库 ---------- */
@@ -353,14 +430,29 @@ function photoSel(id, val) {
   return `<select id="${id}"><option value="">不放图片</option>${PHOTOS.map(p => `<option value="${esc(p.fileId)}" ${p.fileId === val ? "selected" : ""}>${esc(p.name)}</option>`).join("")}${val && !PHOTOS.find(p => p.fileId === val) ? `<option value="${esc(val)}" selected>（沿用现有图片）</option>` : ""}</select>`;
 }
 function renderBot() {
-  const tabs = [["profile", "机器人资料"], ["menu", "菜单按钮"], ["welcome", "欢迎页"], ["faq", "常见问题"], ["activity", "限时活动"], ["targets", "发布位置"]];
+  const tabs = [["profile", "机器人资料"], ["menu", "菜单按钮"], ["welcome", "欢迎页"], ["faq", "常见问题"], ["activity", "限时活动"], ["targets", "发布位置"], ["report", "每周报告"]];
   $("#main").innerHTML = head("机器人设置", "这里的每一项修改，保存后 bot 立即生效，不需要重新部署。") +
     `<div class="card"><div class="tabs" id="bt">${tabs.map(([k, n]) => `<a data-t="${k}" class="${botTab === k ? "on" : ""}">${n}</a>`).join("")}</div><div id="bp"></div></div>`;
   $("#bt").onclick = e => { const a = e.target.closest("a"); if (a) { botTab = a.dataset.t; renderBot(); } };
-  ({ profile: tabProfile, menu: tabMenu, welcome: tabWelcome, faq: tabFaq, activity: tabActivity, targets: tabTargets })[botTab]();
+  ({ profile: tabProfile, menu: tabMenu, welcome: tabWelcome, faq: tabFaq, activity: tabActivity, targets: tabTargets, report: tabReport })[botTab]();
 }
 const saveBtn = fn => { $("#sv").onclick = e => guarded(e.target.closest("button"), async () => { await fn(); toast("已保存，bot 已同步"); }); };
 
+
+/* ---------- 每周报告（默认关闭） ---------- */
+async function tabReport() {
+  const w = await api("weekly-report");
+  $("#bp").innerHTML = `<p class="hint" style="margin-top:0">开启后，系统会在设定的时间把上一周的数据摘要，用 Telegram 私信发给管理员：新增用户、帖子点击、群人数变化、最佳发布时间。默认关闭。</p>
+    ${w.recipients ? "" : '<div class="x-alert">还没有设置接收报告的管理员，请联系技术支持。</div>'}
+    <label style="display:flex;gap:10px;align-items:center;margin-top:0"><input type="checkbox" id="wE" ${w.enabled ? "checked" : ""} style="width:auto"> 开启每周报告</label>
+    <div style="display:flex;gap:12px;margin-top:10px"><div style="flex:1"><label>星期</label><select id="wD">${WD.map((n, i) => `<option value="${i}" ${+w.weekday === i ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+    <div style="flex:1"><label>时间（马来西亚）</label><select id="wH">${Array.from({ length: 24 }, (_, i) => `<option value="${i}" ${+w.hour === i ? "selected" : ""}>${String(i).padStart(2, "0")}:00</option>`).join("")}</select></div></div>
+    <div class="x-actions"><button class="btn" id="wSv">保存</button><button class="btn ghost" id="wPv">预览内容</button><button class="btn ghost" id="wTs">发一份给我看看</button></div>
+    <pre id="wTx" class="x-pre hide"></pre>`;
+  $("#wSv").onclick = e => guarded(e.target.closest("button"), async () => { await api("weekly-report", { method: "PUT", body: { enabled: $("#wE").checked, weekday: $("#wD").value, hour: $("#wH").value } }); toast("已保存"); });
+  $("#wPv").onclick = e => guarded(e.target.closest("button"), async () => { const r = await api("weekly-report/preview", { method: "POST" }); const t = $("#wTx"); t.textContent = r.text; t.classList.remove("hide"); });
+  $("#wTs").onclick = e => guarded(e.target.closest("button"), async () => { await api("weekly-report/test", { method: "POST" }); toast("已发到管理员的 Telegram"); });
+}
 
 /* ---------- 机器人资料（直接同步到 Telegram） ---------- */
 async function tabProfile() {

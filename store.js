@@ -54,6 +54,9 @@ function defaults() {
     targets: [],
     events: [],
     log: [],
+    clicks: [], // 帖子按钮点击记录 {t, a:公告id, b:按钮序号, h:访客指纹}
+    memberStats: [], // 群人数快照 {t, c:chatId, n}
+    weekly: { enabled: false, weekday: 1, hour: 9, lastSent: "" }, // 每周报告（默认关闭）
   };
 }
 

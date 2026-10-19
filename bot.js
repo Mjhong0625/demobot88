@@ -460,21 +460,100 @@ bot.action("internal_tasks", async (ctx) => {
 // ==================================================================
 // 排程发送（读后台公告：状态为 scheduled 且时间已到才发）
 // ==================================================================
+// 帖子底下的按钮：有公开网址时一律走 /r/ 跳转以便统计点击；没有时退回直接链接（无法统计）
+const publicBase = () => (process.env.PUBLIC_URL || "").trim().replace(/\/+$/, "") || (process.env.RAILWAY_PUBLIC_DOMAIN ? "https://" + process.env.RAILWAY_PUBLIC_DOMAIN : "");
+function buildMarkup(a) {
+  const bs = (a.buttons || []).filter((b) => b && b.label && b.url).slice(0, 3);
+  if (!bs.length) return undefined;
+  const base = a.id ? publicBase() : "";
+  return { inline_keyboard: bs.map((b, i) => [{ text: b.label, url: base ? `${base}/r/${a.id}/${i}` : b.url }]) };
+}
+
+// 返回发出的消息编号，之后才能编辑、置顶、删除
 async function sendAnnouncement(a, chatId) {
   const text = a.text || "";
   const media = a.mediaId ? D().media.find((m) => m.id === a.mediaId) : null;
   if (a.mediaId && !media) throw new Error("素材已被删除或已过期，请重新选择素材");
+  const markup = buildMarkup(a);
+  const tracked = !!(markup && a.id && publicBase());
+  const extra = markup ? { reply_markup: markup } : {};
   if (media) {
     const send = media.type === "video" ? bot.telegram.sendVideo.bind(bot.telegram) : bot.telegram.sendPhoto.bind(bot.telegram);
     if (text.length <= 1024) {
-      await send(chatId, media.fileId, { caption: text });
-    } else {
-      await send(chatId, media.fileId);
-      await bot.telegram.sendMessage(chatId, text);
+      const m = await send(chatId, media.fileId, { caption: text, ...extra });
+      return { chatId: m.chat.id, media: m.message_id, text: null, tracked };
     }
-  } else {
-    await bot.telegram.sendMessage(chatId, text || "（空白公告）");
+    const m1 = await send(chatId, media.fileId);
+    const m2 = await bot.telegram.sendMessage(chatId, text, extra);
+    return { chatId: m1.chat.id, media: m1.message_id, text: m2.message_id, tracked };
   }
+  const m = await bot.telegram.sendMessage(chatId, text || "（空白公告）", extra);
+  return { chatId: m.chat.id, media: null, text: m.message_id, tracked };
+}
+
+// 发布后管理：编辑正文/按钮、置顶、从频道删除
+const isNotModified = (e) => /not modified/i.test(e.message || "");
+const postErr = (e) => {
+  const m = e.message || "";
+  if (/not enough rights|administrator rights|CHAT_ADMIN_REQUIRED/i.test(m)) return "bot 在这个频道/群里没有足够的管理权限（需要编辑、删除、置顶消息的权限）";
+  if (/can't be edited|message to edit not found/i.test(m)) return "这则消息已经不能编辑，可能已被删除";
+  if (/message to delete not found/i.test(m)) return "这则消息在 Telegram 里已经不存在";
+  if (/too many requests|retry after/i.test(m)) return "操作太频繁，请稍后再试";
+  return m;
+};
+const postOps = {
+  buildMarkup,
+  async edit(a, { text, buttons }) {
+    const s = a.sent;
+    const tmp = { ...a, text, buttons };
+    const markup = buildMarkup(tmp) || { inline_keyboard: [] };
+    const hasBtnChange = JSON.stringify((a.buttons || [])) !== JSON.stringify(buttons || []);
+    try {
+      if (s.text) await bot.telegram.editMessageText(s.chatId, s.text, undefined, text || "（空白公告）", { reply_markup: markup });
+      else {
+        if (text.length > 1024) throw new Error("带图片或视频的帖子，正文不能超过 1024 字");
+        await bot.telegram.editMessageCaption(s.chatId, s.media, undefined, text, { reply_markup: markup });
+      }
+    } catch (e) {
+      if (!isNotModified(e)) throw new Error(postErr(e));
+      if (hasBtnChange) {
+        try { await bot.telegram.editMessageReplyMarkup(s.chatId, s.text || s.media, undefined, markup); } catch (e2) { if (!isNotModified(e2)) throw new Error(postErr(e2)); }
+      }
+    }
+  },
+  async pin(a, on) {
+    const id = a.sent.media || a.sent.text;
+    try {
+      if (on) await bot.telegram.pinChatMessage(a.sent.chatId, id, { disable_notification: true });
+      else await bot.telegram.unpinChatMessage(a.sent.chatId, id);
+    } catch (e) { throw new Error(postErr(e)); }
+  },
+  async remove(a) {
+    for (const id of [a.sent.media, a.sent.text].filter(Boolean)) {
+      try { await bot.telegram.deleteMessage(a.sent.chatId, id); } catch (e) { if (!/not found/i.test(e.message || "")) throw new Error(postErr(e)); }
+    }
+  },
+  async memberCount(chatId) { return bot.telegram.callApi("getChatMemberCount", { chat_id: chatId }); },
+};
+
+// 通知管理员（发送失败、每周报告）：ADMIN_IDS 和 STORAGE_CHAT_ID
+const adminChats = () => [...new Set([...ADMIN_IDS, String(process.env.STORAGE_CHAT_ID || "")].filter(Boolean))];
+async function notifyAdmins(text) {
+  for (const c of adminChats()) { try { await bot.telegram.sendMessage(c, text); } catch (e) { console.log("[通知失败]", c, e.message); } }
+}
+
+// 群人数快照（每 6 小时一次，用来算增长）
+async function snapshotMembers() {
+  const chats = new Set(D().targets.map((t) => String(t.chatId)));
+  if (process.env.DEFAULT_TARGET) chats.add(String(process.env.DEFAULT_TARGET));
+  for (const c of chats) {
+    try {
+      const n = await postOps.memberCount(c);
+      D().memberStats.push({ t: Date.now(), c, n });
+    } catch (e) { /* bot 不在该群或无权限，略过 */ }
+  }
+  if (D().memberStats.length > 4000) D().memberStats.splice(0, D().memberStats.length - 4000);
+  store.save();
 }
 
 // 公告的发布位置：优先用后台「常用发布位置」，其次旧版直接填的ID，最后是 DEFAULT_TARGET
@@ -500,16 +579,19 @@ async function checkSchedule() {
         a.status = "failed"; a.error = "找不到发布位置（可能已被删除），请重新选择发布位置";
         store.logAction("发送失败", `${a.title}：${a.error}`);
         store.save();
+        notifyAdmins(`发文失败提醒\n帖子：${a.title || "未命名"}\n原因：${a.error}`);
         continue;
       }
       try {
-        await sendAnnouncement(a, target);
+        a.sent = await sendAnnouncement(a, target);
         a.status = "sent"; a.sentAt = new Date().toISOString(); a.error = "";
+        try { a.membersAtSend = await postOps.memberCount(a.sent.chatId); D().memberStats.push({ t: Date.now(), c: String(target), n: a.membersAtSend }); } catch (e) { /* 读不到人数不影响发送 */ }
         store.logEvent("post_sent", 0);
         store.logAction("公告已发送", a.title || a.id);
       } catch (e) {
         a.status = "failed"; a.error = e.message;
         store.logAction("发送失败", `${a.title}：${e.message}`);
+        notifyAdmins(`发文失败提醒\n帖子：${a.title || "未命名"}\n原因：${e.message}`);
       }
       store.save();
     }
@@ -518,11 +600,26 @@ async function checkSchedule() {
   }
 }
 setInterval(checkSchedule, 30000);
+setTimeout(() => snapshotMembers().catch(() => {}), 30000);
+setInterval(() => snapshotMembers().catch(() => {}), 6 * 3600000);
+
+// 每周报告（框架：默认关闭，后台「机器人设置 › 每周报告」打开后，按设定的星期和时间私信管理员）
+const insights = require("./insights");
+const weekKey = (ms) => { const p = insights.mytParts(ms); return `${p.y}-${p.m}-${p.d - p.wd}`; };
+setInterval(async () => {
+  const w = D().weekly;
+  if (!w || !w.enabled) return;
+  const p = insights.mytParts(Date.now());
+  if (p.wd !== Number(w.weekday) || p.h < Number(w.hour) || w.lastSent === weekKey(Date.now())) return;
+  w.lastSent = weekKey(Date.now()); store.save();
+  await notifyAdmins(insights.buildWeeklyReport(D(), D().targets));
+  store.logAction("发送每周报告", "");
+}, 600000);
 
 // ---------------- 启动：后台 + bot ----------------
 let botReady = false;
 const { startAdmin } = require("./admin");
-startAdmin({ bot, store, sendAnnouncement, checkNow: checkSchedule, isReady: () => botReady, token: BOT_TOKEN });
+startAdmin({ bot, store, sendAnnouncement, checkNow: checkSchedule, isReady: () => botReady, token: BOT_TOKEN, ops: postOps, publicBase, snapshotMembers, notifyAdmins });
 
 bot
   .launch({ allowedUpdates: ["message", "callback_query"] }, () => { botReady = true; console.log("Telegram 连线成功"); })

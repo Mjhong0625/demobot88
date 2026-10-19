@@ -47,3 +47,11 @@
 - 不填 Logo 或图片加载失败时显示品牌首字。未提供真实 Logo，本包不含虚构客户 Logo。
 - 本次没有新增后台上传 Logo 接口；后续可由 Claude 将品牌配置接入后台设置。
 - 更新需覆盖 index.html、mjh-ui.css、mjh-ui.js，并新增 brand-config.js。
+
+## V6 新增元素（GPT 改黑白风格时请保留结构，只调样式）
+- 发文窗口：`#bArea`（按钮编辑区，`.x-brow`、`.x-rm`）、预览里的 `#pvB`（`.x-pvbtns`）。
+- 帖子数据弹窗（点已发送的帖子打开）：`.modal.x-stats`、`.x-sg` / `.x-sc`（四个数字卡片）、`.x-bt`（按钮表）、`.x-bars` / `.x-bl`（24 小时柱状）。
+- 总览第二排：群人数卡片（`.x-mn` 人数）、最佳发布时间卡片，沿用 `.two` / `.card` / `.item`。
+- 机器人设置新增「每周报告」页签：`.x-pre` 预览框。
+- 访客只读模式：`body.x-ro`、`.x-guest-note`。
+这些功能样式都在 `app.css`，换色请改 `mjh-ui.css` 里的颜色变量。
