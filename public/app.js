@@ -185,10 +185,10 @@ function drawChart(d) {
   const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
   const area = line + ` L${pts[pts.length - 1][0]} ${H - P.b} L${pts[0][0]} ${H - P.b} Z`;
   let g = "";
-  for (let k = 0; k <= 3; k++) g += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(k * step)}" y2="${y(k * step)}" stroke="#e6e8de" stroke-dasharray="4 5"/><text x="${P.l - 8}" y="${y(k * step) + 4}" text-anchor="end" font-size="11" fill="#9aa08f">${k * step}</text>`;
+  for (let k = 0; k <= 3; k++) g += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(k * step)}" y2="${y(k * step)}" class="c-grid" stroke-dasharray="4 5"/><text x="${P.l - 8}" y="${y(k * step) + 4}" text-anchor="end" font-size="11" class="c-txt">${k * step}</text>`;
   const every = Math.ceil(v.length / 8);
-  const xl = d.labels.map((l, i) => i % every === 0 || i === v.length - 1 ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#9aa08f">${l.slice(5).replace("-", "/")}</text>` : "").join("");
-  $("#chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%"><defs><linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7f9a2c" stop-opacity=".22"/><stop offset="1" stop-color="#7f9a2c" stop-opacity="0"/></linearGradient></defs>${g}${xl}<path d="${area}" fill="url(#gr)"/><path d="${line}" fill="none" stroke="#7f9a2c" stroke-width="2.5" stroke-linejoin="round"/>${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#fff" stroke="#7f9a2c" stroke-width="2"><title>${d.labels[i]}：${v[i]}</title></circle>`).join("")}</svg>`;
+  const xl = d.labels.map((l, i) => i % every === 0 || i === v.length - 1 ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" class="c-txt">${l.slice(5).replace("-", "/")}</text>` : "").join("");
+  $("#chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%"><defs><linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="c-stop" stop-opacity=".22"/><stop offset="1" class="c-stop" stop-opacity="0"/></linearGradient></defs>${g}${xl}<path d="${area}" fill="url(#gr)"/><path d="${line}" fill="none" class="c-line" stroke-width="2.5" stroke-linejoin="round"/>${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" class="c-dot" stroke-width="2"><title>${d.labels[i]}：${v[i]}</title></circle>`).join("")}</svg>`;
 }
 
 /* ---------- 发文排程 ---------- */
@@ -265,7 +265,7 @@ function editAnn(id, dupFrom) {
     const m = mediaOf(), t = $("#aX").value;
     const g = $("#aG"); const tn = g && g.selectedOptions[0] && g.value ? g.selectedOptions[0].textContent : BRAND;
     $("#pvT").textContent = tn;
-    $("#pv").innerHTML = (m ? (m.type === "photo" ? `<img src="/api/media/${m.id}/file">` : `<div class="vid">视频：${esc(m.name)}</div>`) : "") + (t ? esc(t) : '<span style="color:#9aa">您的公告内容会出现在这里。</span>') + `<div class="tm">${(E.mode === "schedule" ? ($("#aA") ? $("#aA").value : E.at) : toLocalInput(new Date().toISOString())).slice(-5)} ✓✓</div>`;
+    $("#pv").innerHTML = (m ? (m.type === "photo" ? `<img src="/api/media/${m.id}/file">` : `<div class="vid">视频：${esc(m.name)}</div>`) : "") + (t ? esc(t) : '<span class="x-ph">您的公告内容会出现在这里。</span>') + `<div class="tm">${(E.mode === "schedule" ? ($("#aA") ? $("#aA").value : E.at) : toLocalInput(new Date().toISOString())).slice(-5)} ✓✓</div>`;
     $("#pvB").innerHTML = E.buttons.filter(b => b.label).map(b => `<div>${esc(b.label)}</div>`).join("");
     const n = t.length;
     $("#aCnt").textContent = m && n > 1024 ? `正文 ${n} 字：带图片/视频时超过 1024 字会拆成两条消息发出` : `${n} 字`;
@@ -367,7 +367,7 @@ async function postDetail(id) {
       <p class="hint" style="margin:0 0 14px">${esc(a.targetName || "")} · 发出于 ${fmtDT(st.sentAt)}（马来西亚时间）${a.pinned ? " · 已置顶" : ""}</p>
       ${st.removedAt ? '<div class="x-alert">这则帖子已经从频道删除，数据仍然保留。</div>' : ""}
       ${hasBtn && !st.tracked ? '<div class="x-alert">这则帖子发出时还没有设置公开网址，按钮没有追踪点击。</div>' : ""}
-      ${!hasBtn ? '<div class="x-alert" style="background:#f4f4f0;border-color:#e3e3dc;color:#555">这则帖子没有按钮，所以没有点击数据。下次发文加上按钮，就能看到转化。</div>' : `
+      ${!hasBtn ? '<div class="x-alert x-note">这则帖子没有按钮，所以没有点击数据。下次发文加上按钮，就能看到转化。</div>' : `
       <div class="x-sg"><div class="x-sc"><small>点击次数</small><b>${st.clicks}</b></div><div class="x-sc"><small>点击人数（约）</small><b>${st.unique}</b></div><div class="x-sc"><small>点击率</small><b>${st.ctr == null ? "-" : st.ctr + "%"}</b></div><div class="x-sc"><small>发出时群人数</small><b>${st.members ? st.members.toLocaleString("en-US") : "-"}</b></div></div>
       <table class="x-bt"><tr><th>按钮</th><th>点击次数</th><th>点击人数</th></tr>${st.buttons.map(b => `<tr><td>${esc(b.label)}<br><small style="color:var(--mute)">${esc(b.url)}</small></td><td>${b.clicks}</td><td>${b.unique}</td></tr>`).join("")}</table>
       <label>发出后 24 小时的点击分布</label>
