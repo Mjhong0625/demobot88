@@ -64,3 +64,9 @@ body.x-ro .x-drop,body.x-ro [data-act],body.x-ro .x-modes{pointer-events:none}
 .x-mn{margin-left:auto;font-size:22px;font-weight:700}
 .x-pre{white-space:pre-wrap;background:#f6f6f3;border:1px solid var(--line);border-radius:12px;padding:14px;font-family:inherit;font-size:14px;margin-top:14px}
 @media(max-width:760px){.x-sg{grid-template-columns:1fr 1fr}.x-brow{grid-template-columns:1fr}}
+
+/* 图表和提示颜色：换色系只需改这几个变量（不必改 app.js） */
+:root{--chart:var(--olive,#7f9a2c);--chart-grid:var(--line,#e6e8de);--chart-txt:var(--mute,#9aa08f);--chart-dot-bg:#fff;--note-bg:#f4f4f0;--note-line:#e3e3dc;--note-ink:#555;--ph:#9aa}
+.c-grid{stroke:var(--chart-grid)}.c-txt{fill:var(--chart-txt)}.c-stop{stop-color:var(--chart)}.c-line{stroke:var(--chart)}.c-dot{fill:var(--chart-dot-bg);stroke:var(--chart)}
+.x-alert.x-note{background:var(--note-bg);border-color:var(--note-line);color:var(--note-ink)}.x-ph{color:var(--ph)}
+.two + .two{margin-top:20px}

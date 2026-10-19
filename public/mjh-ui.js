@@ -89,3 +89,29 @@
  new MutationObserver(title).observe(document.getElementById('wsN'),{childList:true});
  visible=!app.classList.contains('hide');if(visible)refresh();title();
 })();
+
+/* V6 data dialog: table overflow and keyboard/touch chart values. */
+(()=>{
+ const root=document.getElementById('modalRoot');
+ function enhanceDialog(){
+  root.querySelectorAll('table').forEach(table=>{
+   if(table.parentElement.classList.contains('table-scroll'))return;
+   const wrap=document.createElement('div');wrap.className='table-scroll';wrap.tabIndex=0;
+   wrap.setAttribute('role','region');wrap.setAttribute('aria-label','按钮点击明细，可横向滚动');
+   table.before(wrap);wrap.append(table);
+  });
+  root.querySelectorAll('.x-bars').forEach(chart=>{
+   if(chart.dataset.uiReady)return;chart.dataset.uiReady='1';
+   chart.setAttribute('role','group');chart.setAttribute('aria-label','发出后24小时点击分布');
+   const value=document.createElement('div');value.className='ui-bar-value';value.setAttribute('aria-live','polite');
+   value.textContent='选择柱形查看点击次数';chart.nextElementSibling?.after(value);
+   chart.querySelectorAll('i').forEach(bar=>{
+    bar.tabIndex=0;bar.setAttribute('role','button');bar.setAttribute('aria-label',bar.title);
+    const show=()=>{value.textContent=bar.title;};
+    bar.addEventListener('mouseenter',show);bar.addEventListener('focus',show);bar.addEventListener('click',show);
+    bar.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();show();}});
+   });
+  });
+ }
+ new MutationObserver(enhanceDialog).observe(root,{childList:true,subtree:true});enhanceDialog();
+})();
