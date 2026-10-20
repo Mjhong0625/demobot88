@@ -589,6 +589,15 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
     });
   });
 
+  // 总汇的统一登入入口用：只回答「这个账号是否存在」，不回传任何资料
+  app.get("/api/platform/has-user", (req, res) => {
+    const key = process.env.PLATFORM_KEY;
+    if (!key) return res.status(404).json({ error: "未启用" });
+    if (!crypto.timingSafeEqual(keyHash(req.headers["x-platform-key"] || ""), keyHash(key))) return res.status(401).json({ error: "密钥不正确" });
+    const n = String(req.query.u || "").trim().toLowerCase();
+    res.json({ exists: !!n && D().users.some((u) => u.username === n && u.active !== false) });
+  });
+
   // ---------------- 素材库 ----------------
   app.get("/api/media", guard, (req, res) => res.json({ list: D().media.map(mediaView).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)), ttlDays: TTL_DAYS }));
 
