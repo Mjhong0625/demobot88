@@ -1,7 +1,7 @@
 /* Presentation-only enhancement. Does not intercept or rewrite API calls. */
 (()=>{
  const app=document.getElementById('app'),main=document.getElementById('main'),login=document.getElementById('login');
- const pageNames={overview:'工作总览',schedule:'发文排程',media:'素材库',bot:'机器人设置',staff:'员工与权限',log:'操作记录'};
+ const pageNames={overview:'工作总览',schedule:'发文排程',media:'素材库',users:'用户',bot:'机器人设置',staff:'员工与权限',log:'操作记录'};
  const qs=s=>document.querySelector(s);
  qs('#mobileOpen')?.addEventListener('click',()=>{app.classList.toggle('menu-open');qs('#mobileOpen').setAttribute('aria-expanded',app.classList.contains('menu-open'));});
  function closeMenu(){if(app.classList.contains('menu-open'))app.classList.remove('menu-open');qs('#mobileOpen')?.setAttribute('aria-expanded','false');}

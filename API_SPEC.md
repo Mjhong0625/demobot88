@@ -129,3 +129,16 @@ Button = { "id":"", "label":"按钮文字", "type":"builtin|text|link", "enabled
 - `GET /api/insights` → `{bestTimes:{enough,slots:[{hour,label,posts,avgUnique}],needMore}, trackingReady}`，按发帖整点统计平均点击人数，至少 5 则带按钮的帖子且点击满 20 人才给建议。
 - 每周报告（默认关闭）：`GET/PUT /api/weekly-report`（`{enabled,weekday(0=周日),hour}`）、`POST /preview`、`POST /test`。到点由 bot 私信 `ADMIN_IDS` 和 `STORAGE_CHAT_ID`。
 - 发送失败时 bot 也会私信同一批管理员。
+
+## V3.0 模板化新增
+
+### GET /api/tg-users（仅 super_admin，含 owner）
+参数：`q`（名字/@用户名/ID 搜寻）、`filter`（all|active|normal|dormant|bound）、`page`。回传 `{counts:{total,active,normal,dormant,bound}, total, list:[{id,name,username,level,lastSeen,interactions,streak,points,gameId}]}`。
+admin / guest 一律 403。同一人 10 分钟内重复查看只记一次「查看会员名单」操作记录。
+
+### GET /api/platform/summary（给 MJH 总汇用，不走登入）
+Header `x-platform-key: <PLATFORM_KEY>`。未设置 PLATFORM_KEY → 404；密钥错 → 401。
+回传 `{brand, version, demo, time, bot:{ready,username}, users:{total,active7,active30,new24h,new7}, posts:{sent7,scheduled,failed,lastSentAt,lastError}, clicks:{clicks7,unique7}, groups:[{name,count,delta7}], health:{...}}`。**不含任何会员个资**。
+
+### /api/me 新增
+`demoMode`（bool）、`can.userdata`（bool）。

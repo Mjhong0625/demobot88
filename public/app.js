@@ -8,8 +8,10 @@ const ICON = {
   bot: '<svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 14h.01M15 14h.01"/></svg>',
   staff: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c2 .6 3.3 2.2 3.5 5.2"/></svg>',
   log: '<svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>',
+  users: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4.2 3.9-6.5 8-6.5s7.2 2.3 8 6.5"/></svg>',
 };
-const ALL_PAGES = [["overview", "工作总览", "overview"], ["schedule", "发文排程", "schedule"], ["media", "素材库", "media"], ["bot", "机器人设置", "bot"], ["staff", "员工与权限", "staff"], ["log", "操作记录", "log"]];
+const ALL_PAGES = [["overview", "工作总览", "overview"], ["schedule", "发文排程", "schedule"], ["media", "素材库", "media"], ["users", "用户", "users"], ["bot", "机器人设置", "bot"], ["staff", "员工与权限", "staff"], ["log", "操作记录", "log"]];
+const REAL_BUILTIN = ["checkin", "faq_menu", "my_points"];
 const BUILTIN = { activity_menu: "限时活动", bind_id: "领取Giftcode", checkin: "每日签到", my_points: "我的积分", lucky_draw: "幸运抽奖", referral: "邀请好友", faq_menu: "常见问题", internal_menu: "内部功能展示" };
 const WD = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const STATUS = { draft: "草稿", scheduled: "待发送", sent: "已发送", failed: "发送失败" };
@@ -91,7 +93,7 @@ async function boot() {
   if (!me.authed) return showLogin();
   ME = me; BRAND = me.brand;
   $("#wsN").textContent = BRAND; $("#wsL").textContent = BRAND[0] || "D";
-  PAGES = ALL_PAGES.filter(p => ({ bot: me.can.bot, staff: me.can.users, log: me.can.log })[p[0]] ?? true);
+  PAGES = ALL_PAGES.filter(p => ({ bot: me.can.bot, staff: me.can.users, log: me.can.log, users: me.can.userdata })[p[0]] ?? true);
   $("#login").classList.add("hide"); $("#app").classList.remove("hide");
   $("#nav").innerHTML = PAGES.map(([k, n, ic]) => `<a data-p="${k}">${ICON[ic]}${n}</a>`).join("");
   $("#nav").onclick = e => { const a = e.target.closest("a"); if (a) location.hash = a.dataset.p; };
@@ -111,7 +113,7 @@ function route() {
   document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === p));
   const name = (PAGES.find(x => x[0] === p) || [])[1] || "工作总览";
   setTimeout(() => { const b = $("#breadcrumb"); if (b) b.textContent = name; document.title = name + " · MJH Desk"; }, 0);
-  ({ overview: pOverview, schedule: pSchedule, media: pMedia, bot: pBot, staff: pStaff, log: pLog })[p]();
+  ({ overview: pOverview, schedule: pSchedule, media: pMedia, users: pUsers, bot: pBot, staff: pStaff, log: pLog })[p]();
 }
 const head = (t, s, extra = "") => `<div class="top"><div><h1>${t}</h1><p class="lead">${s}</p></div>${extra}</div>`;
 function openModal(html) {
@@ -404,6 +406,26 @@ async function postDetail(id) {
   draw();
 }
 
+/* ---------- 用户（Telegram 会员名单，仅超级管理员） ---------- */
+let usr = { q: "", filter: "all", page: 1 };
+const LV = { active: ["sent", "活跃"], normal: ["scheduled", "一般"], dormant: ["draft", "沉睡"] };
+async function pUsers() {
+  const qs = `tg-users?q=${encodeURIComponent(usr.q)}&filter=${usr.filter}&page=${usr.page}`;
+  const r = await api(qs);
+  const c = r.counts;
+  const tabs = [["all", "全部", c.total], ["active", "活跃", c.active], ["normal", "一般", c.normal], ["dormant", "沉睡", c.dormant], ["bound", "已绑定ID", c.bound]];
+  const keep = $("#uq") ? $("#uq").selectionStart : null;
+  $("#main").innerHTML = head("用户", "所有启动过 bot 的人。名字和 @用户名 来自 Telegram。活跃：7 天内有互动；一般：8 到 30 天；沉睡：超过 30 天。") +
+    `<div class="card"><div class="tabs" id="utabs">${tabs.map(([k, n, v]) => `<a data-f="${k}" class="${usr.filter === k ? "on" : ""}">${n} <span class="x-n">${v}</span></a>`).join("")}</div>
+    <input type="text" id="uq" placeholder="搜索名字、@用户名、ID 或游戏 ID" value="${esc(usr.q)}" style="margin:14px 0">
+    ${r.list.length ? `<table><tr><th>用户</th><th>状态</th><th>最近互动</th><th>互动次数</th><th>连续签到</th><th>积分</th><th>游戏ID</th></tr>${r.list.map(u => `<tr><td><b>${esc(u.name || "（无名字）")}</b><br><small style="color:var(--mute)">${esc(u.username || "无用户名")} · ${esc(u.id)}</small></td><td><span class="chip ${LV[u.level][0]}">${LV[u.level][1]}</span></td><td>${fmtDT(u.lastSeen)}</td><td>${u.count}</td><td>${u.streak || "-"}</td><td>${u.points || "-"}</td><td>${esc(u.gameId || "-")}</td></tr>`).join("")}</table>
+      <div class="x-actions" style="justify-content:space-between"><span class="hint">第 ${r.page} / ${r.pages} 页，共 ${r.total} 人</span><span><button class="btn ghost sm" id="upv" ${r.page <= 1 ? "disabled" : ""}>上一页</button> <button class="btn ghost sm" id="unx" ${r.page >= r.pages ? "disabled" : ""}>下一页</button></span></div>` : `<div class="empty">${c.total ? "没有符合条件的用户" : "还没有用户，有人启动 bot 之后会出现在这里"}</div>`}
+    <p class="hint">会员名单属于个人资料，只有超级管理员可以查看，每次查看都会记入操作记录。</p></div>`;
+  $("#utabs").onclick = e => { const a = e.target.closest("a"); if (a) { usr.filter = a.dataset.f; usr.page = 1; pUsers(); } };
+  let t; $("#uq").oninput = e => { clearTimeout(t); t = setTimeout(() => { usr.q = e.target.value; usr.page = 1; pUsers().then(() => { const q = $("#uq"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }); }, 350); };
+  if ($("#upv")) { $("#upv").onclick = () => { usr.page--; pUsers(); }; $("#unx").onclick = () => { usr.page++; pUsers(); }; }
+}
+
 /* ---------- 素材库 ---------- */
 async function pMedia() {
   const r = await api("media");
@@ -436,7 +458,7 @@ function photoSel(id, val) {
   return `<select id="${id}"><option value="">不放图片</option>${PHOTOS.map(p => `<option value="${esc(p.fileId)}" ${p.fileId === val ? "selected" : ""}>${esc(p.name)}</option>`).join("")}${val && !PHOTOS.find(p => p.fileId === val) ? `<option value="${esc(val)}" selected>（沿用现有图片）</option>` : ""}</select>`;
 }
 function renderBot() {
-  const tabs = [["profile", "机器人资料"], ["menu", "菜单按钮"], ["welcome", "欢迎页"], ["faq", "常见问题"], ["activity", "限时活动"], ["targets", "发布位置"], ["report", "每周报告"]];
+  const tabs = [["profile", "机器人资料"], ["menu", "菜单按钮"], ["welcome", "欢迎页"], ["faq", "常见问题"], ["activity", "限时活动"], ["targets", "发布位置"], ["report", "每周报告"]].filter(t => ME.demoMode || t[0] !== "activity");
   $("#main").innerHTML = head("机器人设置", "这里的每一项修改，保存后 bot 立即生效，不需要重新部署。") +
     `<div class="card"><div class="tabs" id="bt">${tabs.map(([k, n]) => `<a data-t="${k}" class="${botTab === k ? "on" : ""}">${n}</a>`).join("")}</div><div id="bp"></div></div>`;
   $("#bt").onclick = e => { const a = e.target.closest("a"); if (a) { botTab = a.dataset.t; renderBot(); } };
@@ -539,7 +561,7 @@ function btnCard(b, ri, bi) {
   const k = `${ri}-${bi}`;
   return `<div class="bcard" data-k="${k}"><div class="g"><input type="text" data-f="label" value="${esc(b.label)}" placeholder="按钮文字">
   <select data-f="type" data-rr="1"><option value="builtin" ${b.type === "builtin" ? "selected" : ""}>内置功能</option><option value="text" ${b.type === "text" ? "selected" : ""}>文字内容页</option><option value="link" ${b.type === "link" ? "selected" : ""}>外部链接</option></select></div>
-  ${b.type === "builtin" ? `<select data-f="action" style="margin-top:10px">${Object.entries(BUILTIN).map(([v, n]) => `<option value="${v}" ${b.action === v ? "selected" : ""}>${n}</option>`).join("")}</select>` : ""}
+  ${b.type === "builtin" ? `<select data-f="action" style="margin-top:10px">${Object.entries(BUILTIN).filter(([v]) => ME.demoMode || REAL_BUILTIN.includes(v) || b.action === v).map(([v, n]) => `<option value="${v}" ${b.action === v ? "selected" : ""}>${n}</option>`).join("")}</select>` : ""}
   ${b.type === "text" ? `<textarea data-f="content" style="margin-top:10px;min-height:90px" placeholder="点击按钮后显示的内容">${esc(b.content || "")}</textarea><div style="margin-top:8px">${photoSel("img" + k, b.imageId || "").replace("<select", '<select data-f="imageId"')}</div>` : ""}
   ${b.type === "link" ? `<input type="text" data-f="url" style="margin-top:10px" value="${esc(b.url || "")}" placeholder="https://…">` : ""}
   <div style="display:flex;justify-content:space-between;margin-top:10px"><label style="margin:0;font-weight:500"><input type="checkbox" data-f="enabled" ${b.enabled !== false ? "checked" : ""}> 显示此按钮</label><button class="btn danger sm" onclick="rmBtn(${ri},${bi})">删除按钮</button></div></div>`;

@@ -24,8 +24,9 @@ const D = () => store.data;
 const ADMIN_IDS = (process.env.ADMIN_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 // ---------------- 记忆体资料 ----------------
-const members = new Map();
-const checkins = new Map();
+const DEMO = store.DEMO; // 示范模式：只在展示用 demo 开启，正式客户的 bot 不会出现示范功能
+const members = store.table("members");
+const checkins = store.table("checkins");
 const pendingBind = new Set();
 
 function getMember(user) {
@@ -49,7 +50,7 @@ const M = (user) => getMember(user).m;
 function todayStrKL(d = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(d);
 }
-const randomCode = () => "DEMO-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+const randomCode = () => (process.env.GIFT_PREFIX || "DEMO") + "-" + Math.random().toString(36).slice(2, 8).toUpperCase();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -76,7 +77,8 @@ function countdown() {
   if (!(diff > 0)) return null;
   return `${Math.floor(diff / 86400000)}天${Math.floor((diff % 86400000) / 3600000)}小时`;
 }
-const todayCount = () => 1800 + checkins.size * 3;
+// 示范模式显示示范人数；正式版只显示真实的今日签到人数
+const todayCount = () => DEMO ? 1800 + checkins.size * 3 : checkins.values().filter((r) => r.lastDate === todayStrKL()).length;
 
 // ---------------- 界面工具 ----------------
 function btn(b) {
@@ -118,7 +120,28 @@ bot.catch((err, ctx) => console.error(`处理讯息时发生错误 (update ${ctx
 
 // 记录互动（后台总览的数据来源）
 bot.use(async (ctx, next) => {
-  if (ctx.from && ctx.chat?.type === "private") store.logEvent("interact", ctx.from.id);
+  if (ctx.from && ctx.chat?.type === "private") {
+    store.logEvent("interact", ctx.from.id);
+    // 记录 Telegram 用户档案和活跃度（后台「用户」页的数据来源）
+    const f = ctx.from, now = Date.now();
+    const u = D().tgUsers[f.id] || (D().tgUsers[f.id] = { firstSeen: now, count: 0 });
+    u.username = f.username ? "@" + f.username : "";
+    u.name = [f.first_name, f.last_name].filter(Boolean).join(" ");
+    u.lang = f.language_code || "";
+    u.lastSeen = now;
+    u.count += 1;
+  }
+  return next();
+});
+
+// 示范功能（假抽奖、假活动冲榜、模拟邀请、内部功能展示）只在 DEMO_MODE 开放
+const DEMO_ONLY = new Set(["bind_id", "lucky_draw", "referral", "share_referral", "activity_menu", "activity_progress", "activity_contribute", "internal_menu", "internal_posts", "internal_report", "internal_tasks"]);
+bot.use(async (ctx, next) => {
+  const d = ctx.callbackQuery && ctx.callbackQuery.data;
+  if (!DEMO && d && DEMO_ONLY.has(d)) {
+    try { await ctx.answerCbQuery("此功能尚未开通", { show_alert: true }); } catch (e) {}
+    return;
+  }
   return next();
 });
 
@@ -230,7 +253,7 @@ bot.action("checkin", async (ctx) => {
     return safeEdit(
       ctx,
       `📅 你今天已经签到过啦！\n\n🔥 连续签到：${rec.streak}天\n${progressBar(rec.streak, VIP_DAYS)} ${Math.min(rec.streak, VIP_DAYS)}/${VIP_DAYS}天\n` +
-        (remain > 0 ? `再签到 ${remain} 天，解锁 VIP 会员 + RM50 彩金！` : `🎉 你已经是 VIP 会员！`),
+        (!DEMO ? "明天再来继续累积吧！" : remain > 0 ? `再签到 ${remain} 天，解锁 VIP 会员 + RM50 彩金！` : `🎉 你已经是 VIP 会员！`),
       backButton()
     );
   }
@@ -250,8 +273,9 @@ bot.action("checkin", async (ctx) => {
   msg += `🔥 连续签到：${streak}天\n💎 获得 ${bonus} 积分`;
   if (streak > 1) msg += `（连续签到加成 +${bonus - 10}）`;
   msg += `\n${progressBar(streak, VIP_DAYS)} ${Math.min(streak, VIP_DAYS)}/${VIP_DAYS}天\n`;
-  msg += remain > 0 ? `再坚持 ${remain} 天，解锁 VIP 会员 🎯\n⚠️ 断签1天，进度将会重置` : `🎉 恭喜解锁 VIP 会员 + RM50 彩金！`;
-  await safeEdit(ctx, msg, Markup.inlineKeyboard([[Markup.button.callback("🎰 试试手气", "lucky_draw"), Markup.button.callback("⬅️ 返回主菜单", "back_menu")]]));
+  if (DEMO) msg += remain > 0 ? `再坚持 ${remain} 天，解锁 VIP 会员 🎯\n⚠️ 断签1天，进度将会重置` : `🎉 恭喜解锁 VIP 会员 + RM50 彩金！`;
+  else msg += "断签 1 天进度会重新开始，明天记得再来！";
+  await safeEdit(ctx, msg, Markup.inlineKeyboard([DEMO ? [Markup.button.callback("🎰 试试手气", "lucky_draw"), Markup.button.callback("⬅️ 返回主菜单", "back_menu")] : [Markup.button.callback("⬅️ 返回主菜单", "back_menu")]]));
 });
 
 // ==================================================================
@@ -625,9 +649,10 @@ bot
   .launch({ allowedUpdates: ["message", "callback_query"] }, () => { botReady = true; console.log("Telegram 连线成功"); })
   .catch((err) => console.error("❌ bot.launch 发生错误:", err.message));
 
-console.log(`${D().brand} Demo Bot 已启动`);
+console.log(`${D().brand} Bot 已启动（${DEMO ? "DEMO 示范模式" : "正式模式"}）`);
 console.log(`[环境变量检查] STORAGE_CHAT_ID = ${process.env.STORAGE_CHAT_ID || "（未设置，素材上传会失败）"}`);
 console.log(`[环境变量检查] ADMIN_PASSWORD = ${process.env.ADMIN_PASSWORD ? "已设置" : "（未设置，将随机产生）"}`);
+console.log(`[环境变量检查] PLATFORM_KEY = ${process.env.PLATFORM_KEY ? "已设置" : "（未设置，总汇无法读取此品牌）"}`);
 console.log(`[环境变量检查] MEDIA_TTL_DAYS = ${process.env.MEDIA_TTL_DAYS || "30（默认）"}`);
 
 // 收到停止信号（例如 Railway 重新部署）：先停 bot，再真正退出，避免旧进程卡着不放端口

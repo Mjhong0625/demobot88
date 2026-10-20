@@ -4,13 +4,14 @@ const multer = require("multer");
 const crypto = require("crypto");
 const path = require("path");
 const insights = require("./insights");
+const PKG = require("./package.json");
 
 const DAY = 86400000;
 const TTL_DAYS = Math.max(1, Number(process.env.MEDIA_TTL_DAYS) || 30);
 
 // 权限表：super_admin = 全部；admin = 只管内容（总览、发文排程、素材库）
 const PERMS = {
-  super_admin: ["content", "bot", "users", "log", "targets_edit"],
+  super_admin: ["content", "bot", "users", "log", "targets_edit", "userdata"], // userdata = 可查看会员名单（名字、@用户名）
   admin: ["content"],
   guest: ["content", "bot", "log"], // 访客：可以看到所有内容页面，但全部只读（见下方 readOnlyGuard）
 };
@@ -147,7 +148,8 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
       authed: !!u,
       brand: D().brand,
       user: u ? publicUser(u) : null,
-      can: u ? { bot: can(u, "bot"), users: can(u, "users"), log: can(u, "log"), targetsEdit: can(u, "targets_edit") } : null,
+      can: u ? { bot: can(u, "bot"), users: can(u, "users"), log: can(u, "log"), targetsEdit: can(u, "targets_edit"), userdata: can(u, "userdata") } : null,
+      demoMode: !!store.DEMO,
       readonly: !!u && u.role === "guest",
       trackingReady: !!publicBase(),
       mediaTtlDays: TTL_DAYS,
@@ -541,6 +543,50 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
     if (!process.env.STORAGE_CHAT_ID && !process.env.ADMIN_IDS) return res.status(400).json({ error: "还没有设置接收位置（STORAGE_CHAT_ID 或 ADMIN_IDS），请联系技术支持" });
     await notifyAdmins(insights.buildWeeklyReport(D(), D().targets));
     res.json({ ok: true });
+  });
+
+  // ---------------- 会员名单（Telegram 用户档案，仅超级管理员） ----------------
+  const viewLogged = new Map();
+  const level = (ms) => { const d = (Date.now() - ms) / DAY; return d <= 7 ? "active" : d <= 30 ? "normal" : "dormant"; };
+  app.get("/api/tg-users", need("userdata"), (req, res) => {
+    const k = req.user.id;
+    if (Date.now() - (viewLogged.get(k) || 0) > 600000) { viewLogged.set(k, Date.now()); store.logAction("查看会员名单", "", actor(req)); }
+    const q = String(req.query.q || "").trim().toLowerCase();
+    const filter = String(req.query.filter || "all");
+    const page = Math.max(1, Number(req.query.page) || 1), size = 50;
+    const all = Object.entries(D().tgUsers).map(([id, u]) => {
+      const m = D().members[id] || {}, c = D().checkins[id] || {};
+      return { id, username: u.username || "", name: u.name || "", lang: u.lang || "", firstSeen: u.firstSeen, lastSeen: u.lastSeen, count: u.count || 0, gameId: m.gameId || "", points: m.points || 0, streak: c.streak || 0, level: level(u.lastSeen) };
+    });
+    const counts = { total: all.length, active: all.filter((x) => x.level === "active").length, normal: all.filter((x) => x.level === "normal").length, dormant: all.filter((x) => x.level === "dormant").length, bound: all.filter((x) => x.gameId).length };
+    let list = all.filter((x) => (filter === "all" ? true : filter === "bound" ? !!x.gameId : x.level === filter));
+    if (q) list = list.filter((x) => [x.id, x.username, x.name, x.gameId].some((v) => String(v).toLowerCase().includes(q)));
+    list.sort((a, b) => b.lastSeen - a.lastSeen);
+    res.json({ counts, total: list.length, page, pages: Math.max(1, Math.ceil(list.length / size)), list: list.slice((page - 1) * size, page * size) });
+  });
+
+  // ---------------- 给「MJH 总汇」读取的摘要（只有汇总数字，没有任何会员名字） ----------------
+  const keyHash = (v) => crypto.createHash("sha256").update(String(v)).digest();
+  app.get("/api/platform/summary", (req, res) => {
+    const key = process.env.PLATFORM_KEY;
+    if (!key) return res.status(404).json({ error: "未启用" });
+    if (!crypto.timingSafeEqual(keyHash(req.headers["x-platform-key"] || ""), keyHash(key))) return res.status(401).json({ error: "密钥不正确" });
+    const now = Date.now(), d7 = now - 7 * DAY;
+    const us = Object.values(D().tgUsers);
+    const anns = D().announcements;
+    const sent7 = anns.filter((a) => a.status === "sent" && a.sentAt && new Date(a.sentAt).getTime() >= d7);
+    const sentAll = anns.filter((a) => a.status === "sent" && a.sentAt).sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+    const failed = anns.filter((a) => a.status === "failed");
+    const clicks7 = (D().clicks || []).filter((c) => c.t >= d7);
+    res.json({
+      brand: D().brand, version: PKG.version, demo: !!store.DEMO, time: now,
+      bot: { ready: isReady(), username: (bot.botInfo && bot.botInfo.username) || "" },
+      users: { total: us.length, active7: us.filter((u) => u.lastSeen >= d7).length, active30: us.filter((u) => u.lastSeen >= now - 30 * DAY).length, new24h: us.filter((u) => u.firstSeen >= now - DAY).length, new7: us.filter((u) => u.firstSeen >= d7).length },
+      posts: { sent7: sent7.length, scheduled: anns.filter((a) => a.status === "scheduled").length, failed: failed.length, lastSentAt: sentAll[0] ? sentAll[0].sentAt : null, lastError: failed[0] ? failed[0].error : "" },
+      clicks: { clicks7: clicks7.length, unique7: new Set(clicks7.map((c) => c.h)).size },
+      groups: insights.memberSummary(D(), targetList()).map((m) => ({ name: m.name, count: m.count, delta7: m.delta7 })),
+      health: { storageSet: !!process.env.STORAGE_CHAT_ID, hasTargets: targetList().length > 0, trackingReady: !!publicBase() },
+    });
   });
 
   // ---------------- 素材库 ----------------
