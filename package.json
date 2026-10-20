@@ -1,6 +1,6 @@
 {
   "name": "demobet88-demo-bot",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "DemoBet88 Telegram Bot + 管理后台（菜单/文案/FAQ/活动/公告排程/素材上传，后台修改 bot 即时同步）",
   "main": "bot.js",
   "scripts": { "start": "node bot.js" },

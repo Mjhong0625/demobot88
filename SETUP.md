@@ -32,7 +32,7 @@
    ```
 4. **挂 Volume**：Railway 服务 → Settings → Volumes → Mount path 填 `/data`。**正式客户一定要挂**：员工账号、发布位置、素材记录、公告都存在这里，没挂的话重新部署后会全部重置（只适合临时演示）。
 5. **取得 STORAGE_CHAT_ID**：部署成功后，私聊 bot 发 `/chatid`，把回覆的 Chat ID 填进 `STORAGE_CHAT_ID`，让服务重启。
-6. **开启后台网址**：服务 → Settings → Networking → Generate Domain（或绑自己的域名，例如 `desk.mjhco.com`，在域名 DNS 加 CNAME 指向 Railway 给的地址）。用 `ADMIN_PASSWORD` 登入。
+6. **开启后台网址**：服务 → Settings → Networking → Generate Domain（或绑自己的域名，例如 `telegrambot.mjhco.com`，在域名 DNS 加 CNAME 指向 Railway 给的地址）。用 `ADMIN_PASSWORD` 登入。
 
 ⚠️ Railway 若出现变量读不到值，直接换一个新的变量名重新加。启动 log 会印出 `[环境变量检查]`，显示「（未设置）」就是没读到。
 
@@ -72,5 +72,5 @@
 
 
 ## 帖子按钮点击追踪（V6）
-在 Railway Variables 加 `PUBLIC_URL`，值是后台的公开网址（现在是 Railway 的 https 网址，之后换成自己的域名，例如 https://desk.mjhco.com）。没设置时，如果 Railway 已生成域名，系统会自动使用；两者都没有时按钮仍可用，但无法统计点击。
+在 Railway Variables 加 `PUBLIC_URL`，值是后台的公开网址（现在是 Railway 的 https 网址，之后换成自己的域名，例如 https://telegrambot.mjhco.com）。没设置时，如果 Railway 已生成域名，系统会自动使用；两者都没有时按钮仍可用，但无法统计点击。
 新增数据（点击记录、群人数快照）存在 DATA_DIR，正式客户记得挂 Volume。

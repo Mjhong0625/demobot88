@@ -668,4 +668,4 @@ boot();
 
 
 // 从总汇统一入口跳转过来时，自动带入账号
-try { const u = new URLSearchParams(location.search).get("u"); if (u) { const t = setInterval(() => { const el = document.getElementById("un"); if (el) { el.value = u; const pw = document.getElementById("pw"); if (pw) pw.focus(); clearInterval(t); } }, 100); setTimeout(() => clearInterval(t), 3000); } } catch (e) {}
+try { const q = new URLSearchParams(location.search), u = q.get("u"), e = q.get("e"); if (e) { const t2 = setInterval(() => { const el = document.getElementById("lerr"); if (el) { el.textContent = e === "2" ? "尝试次数过多，请10分钟后再试" : "账号或密码不正确"; clearInterval(t2); } }, 100); setTimeout(() => clearInterval(t2), 3000); } if (u) { const t = setInterval(() => { const el = document.getElementById("un"); if (el) { el.value = u; const pw = document.getElementById("pw"); if (pw) pw.focus(); clearInterval(t); } }, 100); setTimeout(() => clearInterval(t), 3000); } } catch (e) {}

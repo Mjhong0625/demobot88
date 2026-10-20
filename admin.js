@@ -117,24 +117,37 @@ function startAdmin({ bot, store, sendAnnouncement, checkNow, isReady, token: BO
 
   // ---------------- 登入 / 登出 / 我 ----------------
   const fails = new Map();
-  app.post("/api/login", (req, res) => {
-    const username = String(req.body.username || "owner").trim().toLowerCase();
+  function tryLogin(req, rawUser, password) {
+    const username = String(rawUser || "owner").trim().toLowerCase();
     const key = `${req.ip}|${username}`;
     const f = fails.get(key) || { n: 0, t: 0 };
-    if (f.n >= 8 && Date.now() - f.t < 600000) return res.status(429).json({ error: "尝试次数过多，请10分钟后再试" });
+    if (f.n >= 8 && Date.now() - f.t < 600000) return { status: 429, error: "尝试次数过多，请10分钟后再试" };
     const user = D().users.find((u) => u.username === username);
-    if (!user || !checkPassword(user, req.body.password || "")) {
+    if (!user || !checkPassword(user, password || "")) {
       fails.set(key, { n: f.n + 1, t: Date.now() });
-      return res.status(401).json({ error: "账号或密码不正确" });
+      return { status: 401, error: "账号或密码不正确" };
     }
-    if (user.active === false) return res.status(403).json({ error: "此账号已停用，请联系你的管理员" });
+    if (user.active === false) return { status: 403, error: "此账号已停用，请联系你的管理员" };
     fails.delete(key);
     const token = crypto.randomBytes(24).toString("hex");
     sessions.set(token, { uid: user.id, exp: Date.now() + SESSION_MS });
     user.lastLoginAt = new Date().toISOString();
     store.save();
-    res.setHeader("Set-Cookie", `mjh_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_MS / 1000}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
+    const cookie = `mjh_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_MS / 1000}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
+    return { ok: true, cookie, username };
+  }
+  app.post("/api/login", (req, res) => {
+    const r = tryLogin(req, req.body.username, req.body.password);
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
+    res.setHeader("Set-Cookie", r.cookie);
     res.json({ ok: true });
+  });
+  // 总汇统一入口：浏览器把账号密码直接提交到这里（密码不经过总汇）
+  app.post("/login-form", express.urlencoded({ extended: false, limit: "10kb" }), (req, res) => {
+    const r = tryLogin(req, req.body.username, req.body.password);
+    if (!r.ok) return res.redirect(303, `/?u=${encodeURIComponent(String(req.body.username || "").slice(0, 40))}&e=${r.status === 429 ? 2 : 1}`);
+    res.setHeader("Set-Cookie", r.cookie);
+    res.redirect(303, "/");
   });
   app.post("/api/logout", (req, res) => {
     const t = cookies(req).mjh_session;
